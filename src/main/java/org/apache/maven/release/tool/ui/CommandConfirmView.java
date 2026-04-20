@@ -56,6 +56,7 @@ public class CommandConfirmView {
     public enum FailureAction {
         RETRY,
         ROLLBACK,
+        IGNORE,
         QUIT
     }
 
@@ -74,6 +75,7 @@ public class CommandConfirmView {
 
         System.out.println();
         System.out.println("  [r] Retry (re-run after fixing the issue)");
+        System.out.println("  [i] Ignore and continue to next step");
         if (offerRollback) {
             System.out.println("  [b] Rollback (mvn release:rollback + release:clean)");
         }
@@ -90,18 +92,20 @@ public class CommandConfirmView {
             switch (input) {
                 case "r":
                     return FailureAction.RETRY;
+                case "i":
+                    return FailureAction.IGNORE;
                 case "b":
                     if (offerRollback) {
                         return FailureAction.ROLLBACK;
                     }
-                    System.out.println("  Rollback not available for this step. Choose r or q.");
+                    System.out.println("  Rollback not available for this step. Choose r/i/q.");
                     System.out.print("  > ");
                     System.out.flush();
                     break;
                 case "", "q":
                     return FailureAction.QUIT;
                 default:
-                    System.out.println("  Unknown option. Choose r" + (offerRollback ? "/b" : "") + "/q.");
+                    System.out.println("  Unknown option. Choose r/i" + (offerRollback ? "/b" : "") + "/q.");
                     System.out.print("  > ");
                     System.out.flush();
                     break;

@@ -69,19 +69,25 @@ java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar --help
 ### Start a new release
 
 ```bash
-# Auto-detects artifactId and component type from pom.xml
+# Auto-detects artifactId, version, and component type from pom.xml
+maven-release-tool start
+
+# Explicit version
 maven-release-tool start --version 3.14.0
 
-# Explicit options
+# All options explicit
 maven-release-tool start \
   --version 3.14.0 \
+  --next-version 3.14.1-SNAPSHOT \
   --component maven-compiler-plugin \
   --type PLUGIN \
   --project-dir /path/to/maven-compiler-plugin
 
 # Dry-run (preview all commands without executing)
-maven-release-tool start --version 3.14.0 --dry-run
+maven-release-tool start --dry-run
 ```
+
+All options are optional — `--version` and `--next-version` are auto-detected from pom.xml or prompted by the release plugin if omitted.
 
 ### Resume after vote or interruption
 

@@ -66,7 +66,9 @@ public class MavenReleaseTool {
     @Command(name = "start", description = "Start a new release")
     static class StartCommand implements Runnable {
 
-        @Option(names = "--version", required = true, description = "Release version")
+        @Option(
+                names = "--version",
+                description = "Release version (optional, release plugin detects from pom.xml if omitted)")
         String version;
 
         @Option(names = "--component", description = "Artifact ID (auto-detected from pom.xml if omitted)")
@@ -103,7 +105,11 @@ public class MavenReleaseTool {
                     type = detectComponentType(runner, absProjectDir);
                 }
 
-                String releaseTag = component + "-" + version;
+                if (version == null) {
+                    version = detectVersion(runner, absProjectDir);
+                }
+
+                String releaseTag = version != null ? component + "-" + version : null;
 
                 ReleaseState state = ReleaseState.create(component, null, version, type, absProjectDir);
                 state.setReleaseTag(releaseTag);
@@ -126,7 +132,8 @@ public class MavenReleaseTool {
                 EtaTracker etaTracker = new EtaTracker(etaHistory);
 
                 System.out.println("=== Maven Release Tool ===");
-                System.out.println("Component: " + component + " " + version);
+                System.out.println(
+                        "Component: " + component + (version != null ? " " + version : " (version from pom.xml)"));
                 System.out.println("Type: " + type);
                 System.out.println("Project: " + absProjectDir);
                 System.out.println("Dry-run: " + dryRun);
@@ -157,6 +164,15 @@ public class MavenReleaseTool {
                     dir,
                     List.of("mvn", "help:evaluate", "-Dexpression=project.parent.artifactId", "-q", "-DforceStdout"));
             return ComponentType.fromParentArtifactId(parentArtifactId.trim());
+        }
+
+        private String detectVersion(CommandRunner runner, Path dir) {
+            String pomVersion = runner.getOutput(
+                    dir, List.of("mvn", "help:evaluate", "-Dexpression=project.version", "-q", "-DforceStdout"));
+            if (!pomVersion.isBlank() && pomVersion.endsWith("-SNAPSHOT")) {
+                return pomVersion.replace("-SNAPSHOT", "");
+            }
+            return pomVersion.isBlank() ? null : pomVersion;
         }
     }
 
@@ -309,120 +325,120 @@ public class MavenReleaseTool {
             throws IOException {
 
         CommandConfirmView confirmView = new CommandConfirmView();
+        ReleaseDashboard dashboard = new ReleaseDashboard(pipeline.getState(), pipeline.getSteps(), etaTracker);
 
-        try (ReleaseDashboard dashboard = new ReleaseDashboard(pipeline.getState(), pipeline.getSteps(), etaTracker)) {
+        dashboard.render();
 
-            dashboard.render();
+        while (pipeline.hasMoreSteps()) {
+            Step step = pipeline.getCurrentStep();
+            StepState stepState = pipeline.getCurrentStepState();
+            if (step == null || stepState == null) {
+                break;
+            }
 
-            while (pipeline.hasMoreSteps()) {
-                Step step = pipeline.getCurrentStep();
-                StepState stepState = pipeline.getCurrentStepState();
-                if (step == null || stepState == null) {
-                    break;
+            if (stepState.getStatus() == StepStatus.COMPLETED || stepState.getStatus() == StepStatus.SKIPPED) {
+                pipeline.getState().advanceToNextStep();
+                continue;
+            }
+
+            CommandResolver.ResolvedCommands resolved = pipeline.resolveCurrentCommands();
+
+            CommandConfirmView.ConfirmResult confirm = confirmView.confirm(step.name(), step.describe(), resolved);
+
+            if (confirm == null) {
+                continue;
+            }
+
+            List<String> commandsToRun = confirm.commands();
+
+            switch (confirm.action()) {
+                case QUIT -> {
+                    pipeline.save();
+                    etaHistory.save();
+                    System.out.println("Release state saved. Exiting.");
+                    return;
                 }
-
-                if (stepState.getStatus() == StepStatus.COMPLETED || stepState.getStatus() == StepStatus.SKIPPED) {
-                    pipeline.getState().advanceToNextStep();
-                    dashboard.render();
+                case SKIP -> {
+                    pipeline.skipCurrentStep();
+                    System.out.println("Skipped: " + step.name());
                     continue;
                 }
-
-                CommandResolver.ResolvedCommands resolved = pipeline.resolveCurrentCommands();
-
-                CommandConfirmView.ConfirmResult confirm = confirmView.confirm(step.name(), step.describe(), resolved);
-
-                if (confirm == null) {
+                case DRY_RUN -> {
+                    StepResult dryResult = pipeline.dryRunCurrentStep();
+                    if (dryResult.message() != null) {
+                        System.out.println(dryResult.message());
+                    }
                     continue;
                 }
+                case EDITED -> {
+                    confirmView.promptSaveOverride(commandsToRun, step.name(), overrideStore, projectConfig);
+                }
+                case ACCEPT -> {
+                    // fall through to execute
+                }
+                default -> {
+                    continue;
+                }
+            }
 
-                List<String> commandsToRun = confirm.commands();
+            StepResult result = pipeline.executeCurrentStep(commandsToRun);
 
-                switch (confirm.action()) {
-                    case QUIT -> {
+            if (result.message() != null) {
+                System.out.println(result.message());
+            }
+
+            if (result.succeeded()) {
+                if (result.suggestedAction() == StepResult.Action.PAUSE) {
+                    etaHistory.save();
+                    System.out.println("Release state saved. Exiting.");
+                    return;
+                }
+                if (stepState.getDurationSeconds() != null) {
+                    etaTracker.recordCompletedStep(pipeline.getState(), stepState);
+                }
+            } else {
+                System.out.println("Step failed: " + result.message());
+                boolean isReleaseStep = step.name().startsWith("maven-release-");
+
+                CommandConfirmView.FailureAction failureAction =
+                        confirmView.promptOnFailure(step.name(), isReleaseStep);
+
+                switch (failureAction) {
+                    case RETRY -> {
+                        stepState.setStatus(StepStatus.PENDING);
                         pipeline.save();
+                        continue;
+                    }
+                    case IGNORE -> {
+                        System.out.println("Ignoring failure, continuing to next step.");
+                        stepState.markSkipped();
+                        pipeline.getState().advanceToNextStep();
+                        pipeline.save();
+                        continue;
+                    }
+                    case ROLLBACK -> {
+                        System.out.println("Running mvn release:rollback...");
+                        CommandRunner rollbackRunner = new CommandRunner(System.out::println);
+                        rollbackRunner.exec(
+                                Path.of(pipeline.getState().getProjectDir()), List.of("mvn", "release:rollback"));
+                        System.out.println("Running mvn release:clean...");
+                        rollbackRunner.exec(
+                                Path.of(pipeline.getState().getProjectDir()), List.of("mvn", "release:clean"));
+                        System.out.println("Rollback complete. Release state saved.");
                         etaHistory.save();
-                        dashboard.println("Release state saved. Exiting.");
                         return;
-                    }
-                    case SKIP -> {
-                        pipeline.skipCurrentStep();
-                        dashboard.println("Skipped: " + step.name());
-                        dashboard.render();
-                        continue;
-                    }
-                    case DRY_RUN -> {
-                        StepResult dryResult = pipeline.dryRunCurrentStep();
-                        if (dryResult.message() != null) {
-                            dashboard.println(dryResult.message());
-                        }
-                        dashboard.render();
-                        continue;
-                    }
-                    case EDITED -> {
-                        confirmView.promptSaveOverride(commandsToRun, step.name(), overrideStore, projectConfig);
-                    }
-                    case ACCEPT -> {
-                        // fall through to execute
                     }
                     default -> {
-                        continue;
-                    }
-                }
-
-                StepResult result = pipeline.executeCurrentStep(commandsToRun);
-
-                if (result.message() != null) {
-                    dashboard.println(result.message());
-                }
-
-                if (result.succeeded()) {
-                    if (result.suggestedAction() == StepResult.Action.PAUSE) {
+                        System.out.println("Release state saved. Fix the issue and resume.");
                         etaHistory.save();
-                        dashboard.println("Release state saved. Exiting.");
                         return;
                     }
-                    if (stepState.getDurationSeconds() != null) {
-                        etaTracker.recordCompletedStep(pipeline.getState(), stepState);
-                    }
-                } else {
-                    dashboard.println("Step failed: " + result.message());
-                    boolean isReleaseStep = step.name().startsWith("maven-release-");
-
-                    CommandConfirmView.FailureAction failureAction =
-                            confirmView.promptOnFailure(step.name(), isReleaseStep);
-
-                    switch (failureAction) {
-                        case RETRY -> {
-                            stepState.setStatus(StepStatus.PENDING);
-                            pipeline.save();
-                            continue;
-                        }
-                        case ROLLBACK -> {
-                            dashboard.println("Running mvn release:rollback...");
-                            // Uses ProcessBuilder directly (no shell) — safe
-                            CommandRunner rollbackRunner = new CommandRunner(dashboard::println);
-                            rollbackRunner.exec(
-                                    Path.of(pipeline.getState().getProjectDir()), List.of("mvn", "release:rollback"));
-                            dashboard.println("Running mvn release:clean...");
-                            rollbackRunner.exec(
-                                    Path.of(pipeline.getState().getProjectDir()), List.of("mvn", "release:clean"));
-                            dashboard.println("Rollback complete. Release state saved.");
-                            etaHistory.save();
-                            return;
-                        }
-                        default -> {
-                            dashboard.println("Release state saved. Fix the issue and resume.");
-                            etaHistory.save();
-                            return;
-                        }
-                    }
                 }
-
-                dashboard.render();
             }
         }
 
         etaHistory.save();
-        System.out.println("=== Release complete! ===");
+        dashboard.render();
+        System.out.println("\n=== Release complete! ===");
     }
 }

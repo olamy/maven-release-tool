@@ -18,13 +18,10 @@
  */
 package org.apache.maven.release.tool.ui;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 
-import dev.tamboui.inline.InlineDisplay;
-import dev.tamboui.layout.Constraint;
-import dev.tamboui.layout.Layout;
+import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Color;
 import dev.tamboui.style.Modifier;
@@ -42,84 +39,78 @@ import org.apache.maven.release.tool.steps.Step;
 
 public class ReleaseDashboard implements AutoCloseable {
 
-    private final InlineDisplay display;
+    private static final int WIDTH = 80;
+
     private final ReleaseState state;
     private final List<Step> steps;
     private final EtaTracker etaTracker;
 
-    public ReleaseDashboard(ReleaseState state, List<Step> steps, EtaTracker etaTracker) throws IOException {
-        int displayHeight = Math.min(steps.size() + 4, 24);
-        this.display = InlineDisplay.create(displayHeight);
+    public ReleaseDashboard(ReleaseState state, List<Step> steps, EtaTracker etaTracker) {
         this.state = state;
         this.steps = steps;
         this.etaTracker = etaTracker;
     }
 
     public void render() {
-        display.render((area, buf) -> {
-            Rect[] rows = Layout.vertical()
-                    .constraints(
-                            Constraint.length(1),
-                            Constraint.length(1),
-                            Constraint.min(1),
-                            Constraint.length(1),
-                            Constraint.length(1))
-                    .split(area)
-                    .toArray(new Rect[0]);
-
-            renderHeader(rows[0], buf);
-            renderEta(rows[1], buf);
-            renderStepList(rows[2], buf);
-            renderProgressBar(rows[3], buf);
-            renderKeyHints(rows[4], buf);
-        });
+        System.out.println();
+        printHeader();
+        printEta();
+        System.out.println();
+        printStepList();
+        System.out.println();
+        printProgressBar();
     }
 
-    private void renderHeader(Rect area, dev.tamboui.buffer.Buffer buf) {
-        String title = "Maven Release Tool — " + state.getArtifactId() + " " + state.getVersion();
+    private void printHeader() {
+        String version = state.getVersion() != null ? " " + state.getVersion() : "";
+        String title = "Maven Release Tool — " + state.getArtifactId() + version;
+        Buffer buf = Buffer.empty(Rect.of(WIDTH, 1));
         Paragraph.builder()
                 .text(Text.from(Line.from(
                         Span.styled("▸ ", Style.EMPTY.fg(Color.CYAN).addModifier(Modifier.BOLD)),
                         Span.styled(title, Style.EMPTY.addModifier(Modifier.BOLD)))))
                 .build()
-                .render(area, buf);
+                .render(buf.area(), buf);
+        System.out.println(buf.toAnsiStringTrimmed());
     }
 
-    private void renderEta(Rect area, dev.tamboui.buffer.Buffer buf) {
+    private void printEta() {
         Duration remaining = etaTracker.estimateRemaining(state, steps);
         String etaStr = remaining.isZero() ? "" : "  ETA: " + etaTracker.formatDuration(remaining);
         String phaseInfo = "  Step " + (state.getCurrentStepIndex() + 1) + "/" + steps.size() + etaStr;
 
+        Buffer buf = Buffer.empty(Rect.of(WIDTH, 1));
         Paragraph.builder()
                 .text(Text.styled(phaseInfo, Style.EMPTY.fg(Color.GRAY)))
                 .build()
-                .render(area, buf);
+                .render(buf.area(), buf);
+        System.out.println(buf.toAnsiStringTrimmed());
     }
 
-    private void renderStepList(Rect area, dev.tamboui.buffer.Buffer buf) {
-        int startIdx = Math.max(0, state.getCurrentStepIndex() - (area.height() / 2));
-        int endIdx = Math.min(steps.size(), startIdx + area.height());
-
-        for (int i = startIdx; i < endIdx; i++) {
-            int row = i - startIdx;
-            if (row >= area.height()) {
-                break;
-            }
-
-            Rect lineArea = new Rect(area.x(), area.y() + row, area.width(), 1);
+    private void printStepList() {
+        for (int i = 0; i < steps.size(); i++) {
             StepState stepState = i < state.getSteps().size() ? state.getSteps().get(i) : null;
             StepStatus status = stepState != null ? stepState.getStatus() : StepStatus.PENDING;
             boolean isCurrent = i == state.getCurrentStepIndex();
 
-            Span icon =
+            String icon =
                     switch (status) {
-                        case COMPLETED -> Span.styled("✓ ", Style.EMPTY.fg(Color.GREEN));
-                        case FAILED -> Span.styled("✗ ", Style.EMPTY.fg(Color.RED));
-                        case SKIPPED -> Span.styled("⊘ ", Style.EMPTY.fg(Color.YELLOW));
-                        case IN_PROGRESS ->
-                            Span.styled("⟳ ", Style.EMPTY.fg(Color.CYAN).addModifier(Modifier.BOLD));
-                        case WAITING -> Span.styled("⏳", Style.EMPTY.fg(Color.YELLOW));
-                        default -> Span.styled("○ ", Style.EMPTY.fg(Color.DARK_GRAY));
+                        case COMPLETED -> "  ✓ ";
+                        case FAILED -> "  ✗ ";
+                        case SKIPPED -> "  ⊘ ";
+                        case IN_PROGRESS -> "  ⟳ ";
+                        case WAITING -> "  ⏳ ";
+                        default -> "  ○ ";
+                    };
+
+            Style iconStyle =
+                    switch (status) {
+                        case COMPLETED -> Style.EMPTY.fg(Color.GREEN);
+                        case FAILED -> Style.EMPTY.fg(Color.RED);
+                        case SKIPPED -> Style.EMPTY.fg(Color.YELLOW);
+                        case IN_PROGRESS -> Style.EMPTY.fg(Color.CYAN).addModifier(Modifier.BOLD);
+                        case WAITING -> Style.EMPTY.fg(Color.YELLOW);
+                        default -> Style.EMPTY.fg(Color.DARK_GRAY);
                     };
 
             Style nameStyle = isCurrent
@@ -134,59 +125,38 @@ public class ReleaseDashboard implements AutoCloseable {
                 duration = String.format("  %02d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60);
             }
 
+            Buffer buf = Buffer.empty(Rect.of(WIDTH, 1));
             Paragraph.builder()
                     .text(Text.from(Line.from(
-                            icon,
+                            Span.styled(icon, iconStyle),
                             Span.styled(steps.get(i).describe(), nameStyle),
                             Span.styled(duration, Style.EMPTY.fg(Color.DARK_GRAY)))))
                     .build()
-                    .render(lineArea, buf);
+                    .render(buf.area(), buf);
+            System.out.println(buf.toAnsiStringTrimmed());
         }
     }
 
-    private void renderProgressBar(Rect area, dev.tamboui.buffer.Buffer buf) {
+    private void printProgressBar() {
         double ratio = steps.isEmpty() ? 0 : (double) state.completedStepCount() / steps.size();
         String label = state.completedStepCount() + "/" + steps.size() + " steps (" + Math.round(ratio * 100) + "%)";
 
+        Buffer buf = Buffer.empty(Rect.of(WIDTH, 1));
         Gauge.builder()
                 .ratio(ratio)
                 .label(label)
                 .gaugeStyle(Style.EMPTY.fg(Color.CYAN))
                 .build()
-                .render(area, buf);
-    }
-
-    private void renderKeyHints(Rect area, dev.tamboui.buffer.Buffer buf) {
-        Paragraph.builder()
-                .text(Text.from(Line.from(
-                        Span.styled("[Enter]", Style.EMPTY.fg(Color.GREEN).addModifier(Modifier.BOLD)),
-                        Span.raw(" Run  "),
-                        Span.styled("[s]", Style.EMPTY.fg(Color.YELLOW).addModifier(Modifier.BOLD)),
-                        Span.raw(" Skip  "),
-                        Span.styled("[d]", Style.EMPTY.fg(Color.CYAN).addModifier(Modifier.BOLD)),
-                        Span.raw(" Dry-run  "),
-                        Span.styled("[v]", Style.EMPTY.fg(Color.MAGENTA).addModifier(Modifier.BOLD)),
-                        Span.raw(" Detail  "),
-                        Span.styled("[q]", Style.EMPTY.fg(Color.RED).addModifier(Modifier.BOLD)),
-                        Span.raw(" Save & quit"))))
-                .build()
-                .render(area, buf);
+                .render(buf.area(), buf);
+        System.out.println(buf.toAnsiStringTrimmed());
     }
 
     public void println(String message) {
-        display.println(message);
-    }
-
-    public void println(Text text) {
-        display.println(text);
+        System.out.println(message);
     }
 
     @Override
     public void close() {
-        try {
-            display.close();
-        } catch (Exception e) {
-            // ignore
-        }
+        // nothing to close — no InlineDisplay
     }
 }

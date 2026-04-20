@@ -46,7 +46,9 @@ public class MavenPrepareStep extends AbstractStep {
         List<String> parts = new ArrayList<>();
         parts.add("mvn");
         parts.add("release:prepare");
-        parts.add("-DreleaseVersion=" + state.getVersion());
+        if (state.getVersion() != null) {
+            parts.add("-DreleaseVersion=" + state.getVersion());
+        }
         if (state.getNextVersion() != null) {
             parts.add("-DdevelopmentVersion=" + state.getNextVersion());
         }
