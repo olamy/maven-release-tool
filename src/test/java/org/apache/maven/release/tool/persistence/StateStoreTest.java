@@ -40,6 +40,13 @@ class StateStoreTest {
     Path tempDir;
 
     @Test
+    void defaultBaseDirPointsToM2() {
+        StateStore store = new StateStore();
+        Path expected = Path.of(System.getProperty("user.home"), ".m2", "maven-release-tool");
+        assertEquals(expected, store.getBaseDir());
+    }
+
+    @Test
     void saveAndLoadRoundTrip() throws IOException {
         StateStore store = new StateStore(tempDir);
         ReleaseState state = ReleaseState.create(

@@ -76,6 +76,13 @@ public class CommandRunner {
     }
 
     /**
+     * Emit a progress message through the configured output handler.
+     */
+    public void log(String message) {
+        outputHandler.accept(message);
+    }
+
+    /**
      * Execute a command and capture its stdout (no streaming to output handler).
      * Uses ProcessBuilder directly — no shell involved.
      */

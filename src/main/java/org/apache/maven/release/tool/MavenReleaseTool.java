@@ -40,6 +40,7 @@ import org.apache.maven.release.tool.pipeline.ReleasePipeline;
 import org.apache.maven.release.tool.steps.Step;
 import org.apache.maven.release.tool.ui.CommandConfirmView;
 import org.apache.maven.release.tool.ui.ReleaseDashboard;
+import org.apache.maven.release.tool.ui.ReleaseSelector;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -179,51 +180,28 @@ public class MavenReleaseTool {
     @Command(name = "resume", description = "Resume an in-progress release")
     static class ResumeCommand implements Runnable {
 
-        @Option(names = "--component", required = true, description = "Artifact ID")
+        @Option(names = "--component", description = "Artifact ID (optional when --dashboard is used)")
         String component;
 
-        @Option(names = "--version", required = true, description = "Release version")
+        @Option(names = "--version", description = "Release version (optional when --dashboard is used)")
         String version;
+
+        @Option(names = "--dashboard", description = "Open interactive dashboard to select a release")
+        boolean dashboard;
 
         @Override
         public void run() {
             try {
-                StateStore stateStore = new StateStore();
-                ReleaseState state = stateStore.load(component, version);
-                if (state == null) {
-                    System.err.println("No in-progress release found for " + component + " " + version);
-                    return;
+                if (dashboard || component == null || version == null) {
+                    StateStore stateStore = new StateStore();
+                    ReleaseState selected = selectFromDashboard(stateStore);
+                    if (selected == null) {
+                        return;
+                    }
+                    resumeRelease(stateStore, selected.getArtifactId(), selected.getVersion());
+                } else {
+                    resumeRelease(new StateStore(), component, version);
                 }
-
-                CommandRunner runner = new CommandRunner();
-                CommandOverrideStore overrideStore = new CommandOverrideStore(stateStore.getBaseDir());
-                ProjectConfig projectConfig = overrideStore.load(state.getGitRemoteUrl());
-
-                PipelineBuilder pipelineBuilder = new PipelineBuilder(runner, stateStore);
-                List<Step> steps = pipelineBuilder.buildPipeline(state.getComponentType());
-
-                ReleasePipeline pipeline = new ReleasePipeline(steps, state, stateStore, overrideStore, projectConfig);
-
-                EtaHistory etaHistory = new EtaHistory(stateStore.getBaseDir());
-                etaHistory.load();
-                EtaTracker etaTracker = new EtaTracker(etaHistory);
-
-                System.out.println("=== Resuming Release ===");
-                System.out.println("Component: " + component + " " + version);
-                System.out.println("Resuming from step " + (state.getCurrentStepIndex() + 1) + "/" + steps.size());
-                System.out.println();
-
-                // If current step is waiting (vote), handle it
-                StepState currentStep = state.getCurrentStep();
-                if (currentStep != null && currentStep.getStatus() == StepStatus.WAITING) {
-                    System.out.println("Previous step '" + currentStep.getName() + "' was waiting.");
-                    currentStep.markCompleted();
-                    state.advanceToNextStep();
-                    stateStore.save(state);
-                }
-
-                runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig);
-
             } catch (IOException e) {
                 System.err.println("Error: " + e.getMessage());
             }
@@ -232,23 +210,35 @@ public class MavenReleaseTool {
 
     @Command(name = "list", description = "List in-progress releases")
     static class ListCommand implements Runnable {
+
+        @Option(names = "--dashboard", description = "Open interactive dashboard to select a release")
+        boolean dashboard;
+
         @Override
         public void run() {
             try {
                 StateStore stateStore = new StateStore();
-                List<ReleaseState> releases = stateStore.listAll();
-                if (releases.isEmpty()) {
-                    System.out.println("No in-progress releases.");
-                    return;
-                }
-                System.out.println("In-progress releases:");
-                for (ReleaseState r : releases) {
-                    System.out.printf(
-                            "  %-40s  step %d/%d  %s%n",
-                            r.getReleaseId(),
-                            r.getCurrentStepIndex() + 1,
-                            r.getSteps().size(),
-                            r.getCurrentStep() != null ? r.getCurrentStep().getStatus() : "");
+                if (dashboard) {
+                    ReleaseState selected = selectFromDashboard(stateStore);
+                    if (selected == null) {
+                        return;
+                    }
+                    resumeRelease(stateStore, selected.getArtifactId(), selected.getVersion());
+                } else {
+                    List<ReleaseState> releases = stateStore.listAll();
+                    if (releases.isEmpty()) {
+                        System.out.println("No in-progress releases.");
+                        return;
+                    }
+                    System.out.println("In-progress releases:");
+                    for (ReleaseState r : releases) {
+                        System.out.printf(
+                                "  %-40s  step %d/%d  %s%n",
+                                r.getReleaseId(),
+                                r.getCurrentStepIndex() + 1,
+                                r.getSteps().size(),
+                                r.getCurrentStep() != null ? r.getCurrentStep().getStatus() : "");
+                    }
                 }
             } catch (IOException e) {
                 System.err.println("Error: " + e.getMessage());
@@ -313,6 +303,47 @@ public class MavenReleaseTool {
                 System.err.println("Error: " + e.getMessage());
             }
         }
+    }
+
+    private static ReleaseState selectFromDashboard(StateStore stateStore) throws IOException {
+        List<ReleaseState> releases = stateStore.listAll();
+        return new ReleaseSelector().select(releases);
+    }
+
+    private static void resumeRelease(StateStore stateStore, String component, String version) throws IOException {
+        ReleaseState state = stateStore.load(component, version);
+        if (state == null) {
+            System.err.println("No in-progress release found for " + component + " " + version);
+            return;
+        }
+
+        CommandRunner runner = new CommandRunner();
+        CommandOverrideStore overrideStore = new CommandOverrideStore(stateStore.getBaseDir());
+        ProjectConfig projectConfig = overrideStore.load(state.getGitRemoteUrl());
+
+        PipelineBuilder pipelineBuilder = new PipelineBuilder(runner, stateStore);
+        List<Step> steps = pipelineBuilder.buildPipeline(state.getComponentType());
+
+        ReleasePipeline pipeline = new ReleasePipeline(steps, state, stateStore, overrideStore, projectConfig);
+
+        EtaHistory etaHistory = new EtaHistory(stateStore.getBaseDir());
+        etaHistory.load();
+        EtaTracker etaTracker = new EtaTracker(etaHistory);
+
+        System.out.println("=== Resuming Release ===");
+        System.out.println("Component: " + component + " " + version);
+        System.out.println("Resuming from step " + (state.getCurrentStepIndex() + 1) + "/" + steps.size());
+        System.out.println();
+
+        StepState currentStep = state.getCurrentStep();
+        if (currentStep != null && currentStep.getStatus() == StepStatus.WAITING) {
+            System.out.println("Previous step '" + currentStep.getName() + "' was waiting.");
+            currentStep.markCompleted();
+            state.advanceToNextStep();
+            stateStore.save(state);
+        }
+
+        runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig);
     }
 
     private static void runPipeline(
@@ -407,14 +438,12 @@ public class MavenReleaseTool {
                     case RETRY -> {
                         stepState.setStatus(StepStatus.PENDING);
                         pipeline.save();
-                        continue;
                     }
                     case IGNORE -> {
                         System.out.println("Ignoring failure, continuing to next step.");
                         stepState.markSkipped();
                         pipeline.getState().advanceToNextStep();
                         pipeline.save();
-                        continue;
                     }
                     case ROLLBACK -> {
                         System.out.println("Running mvn release:rollback...");

@@ -50,7 +50,7 @@ public class StateStore {
     }
 
     private static Path defaultBaseDir() {
-        return Path.of(System.getProperty("user.home"), ".maven", "release-tool");
+        return Path.of(System.getProperty("user.home"), ".m2", "maven-release-tool");
     }
 
     public Path getBaseDir() {

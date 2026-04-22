@@ -41,6 +41,8 @@ java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar --help
 java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar start --dry-run
 java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar start --version 3.14.0 --dry-run
 java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar list
+java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar list --dashboard
+java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar resume --dashboard
 ```
 
 ## Known Build Notes
@@ -71,7 +73,7 @@ org.apache.maven.release.tool
 │   └── ...                        18 concrete steps (PreReleaseChecks through VerifyDistTool)
 ├── pipeline/                      PipelineBuilder (assembles steps by ComponentType) + ReleasePipeline (drives execution)
 ├── config/                        Per-project command overrides (CommandOverrideStore, CommandResolver, ProjectConfig)
-├── persistence/                   StateStore — JSON serialization to ~/.maven/release-tool/releases/<id>/
+├── persistence/                   StateStore — JSON serialization to ~/.m2/maven-release-tool/releases/<id>/
 ├── eta/                           EtaTracker + EtaHistory — median step durations from past releases
 ├── exec/                          CommandRunner — ProcessBuilder-based command execution (no shell involved)
 ├── integration/                   NexusClient (Jetty HTTP Client) for Nexus staging API
@@ -83,7 +85,7 @@ org.apache.maven.release.tool
 - **Shell out to `mvn`** for release:prepare/perform rather than using the ReleaseManager Java API.
   This keeps the tool transparent — user sees exact commands, uses their own settings.xml.
 - **Per-project command overrides** keyed by git remote URL. Stored in
-  `~/.maven/release-tool/projects/<name>/commands.json`. Resolved via 3-level hierarchy:
+  `~/.m2/maven-release-tool/projects/<name>/commands.json`. Resolved via 3-level hierarchy:
   project override > component-type default > global default.
 - **Every command is confirmed** before execution. User can Accept/Edit/Skip/Dry-run/Quit.
   Edits can optionally be saved as project overrides for future releases.
@@ -110,7 +112,7 @@ Each step's `isApplicable()` controls which types it runs for.
 ### Storage Layout
 
 ```
-~/.maven/release-tool/
+~/.m2/maven-release-tool/
 ├── projects/<name>/commands.json   Per-project command overrides
 ├── releases/<id>/                  Per-release state, emails, logs
 │   ├── release-state.json

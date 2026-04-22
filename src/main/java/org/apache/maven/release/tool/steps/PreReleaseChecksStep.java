@@ -20,11 +20,21 @@ package org.apache.maven.release.tool.steps;
 
 import java.util.List;
 
+import dev.tamboui.buffer.Buffer;
+import dev.tamboui.layout.Rect;
+import dev.tamboui.style.Color;
+import dev.tamboui.style.Style;
+import dev.tamboui.text.Line;
+import dev.tamboui.text.Span;
+import dev.tamboui.text.Text;
+import dev.tamboui.widgets.paragraph.Paragraph;
 import org.apache.maven.release.tool.exec.CommandRunner;
 import org.apache.maven.release.tool.model.ReleaseState;
 import org.apache.maven.release.tool.model.StepResult;
 
 public class PreReleaseChecksStep extends AbstractStep {
+
+    private static final int WIDTH = 80;
 
     public PreReleaseChecksStep(CommandRunner runner) {
         super(runner);
@@ -50,14 +60,18 @@ public class PreReleaseChecksStep extends AbstractStep {
         // Check GPG key
         String gpgOutput = runner.getOutput(projectDir(state), List.of("gpg", "--list-secret-keys"));
         if (gpgOutput.isBlank()) {
+            logFailure("No GPG secret keys found");
             return StepResult.failure("No GPG secret keys found. Configure GPG signing before releasing.");
         }
+        logSuccess("GPG signing key found");
 
         // Check git is clean
         String gitStatus = runner.getOutput(projectDir(state), List.of("git", "status", "--porcelain"));
         if (!gitStatus.isBlank()) {
+            logFailure("Working directory is not clean");
             return StepResult.failure("Working directory is not clean:\n" + gitStatus);
         }
+        logSuccess("Working directory clean");
 
         // Check no SNAPSHOT dependencies (quick grep in pom.xml)
         String snapshots = runner.getOutput(projectDir(state), List.of("grep", "-r", "SNAPSHOT", "pom.xml"));
@@ -70,9 +84,28 @@ public class PreReleaseChecksStep extends AbstractStep {
                 .count();
 
         if (externalSnapshots > 0) {
+            logFailure("Found external SNAPSHOT dependencies");
             return StepResult.failure("Found SNAPSHOT dependencies in pom.xml. Resolve them before releasing.");
         }
+        logSuccess("No external SNAPSHOT dependencies");
 
         return StepResult.ok("All pre-release checks passed.");
+    }
+
+    private void logSuccess(String message) {
+        runner.log(styledCheck("  ✓ ", Color.GREEN, message));
+    }
+
+    private void logFailure(String message) {
+        runner.log(styledCheck("  ✗ ", Color.RED, message));
+    }
+
+    private static String styledCheck(String icon, Color iconColor, String message) {
+        Buffer buf = Buffer.empty(Rect.of(WIDTH, 1));
+        Paragraph.builder()
+                .text(Text.from(Line.from(Span.styled(icon, Style.EMPTY.fg(iconColor)), Span.raw(message))))
+                .build()
+                .render(buf.area(), buf);
+        return buf.toAnsiStringTrimmed();
     }
 }
