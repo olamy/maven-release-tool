@@ -73,21 +73,34 @@ public class CallVoteStep extends AbstractStep {
     }
 
     private String generateVoteEmail(ReleaseState state) {
-        String componentName = formatComponentName(state);
+        String componentName = buildComponentName(state);
+        String repoName = extractRepoName(state.getGitRemoteUrl(), state.getArtifactId());
         String stagingUrl = state.getStagingRepoUrl() != null
                 ? state.getStagingRepoUrl()
-                : "https://repository.apache.org/content/repositories/<staging-repo-id>";
+                : "https://repository.apache.org/content/repositories/maven-<staging-repo-id>";
+        String currentTag = state.getReleaseTag() != null ? state.getReleaseTag() : "<current-tag>";
+        String previousTag = state.getPreviousTag() != null ? state.getPreviousTag() : "<previous-tag>";
 
         StringBuilder sb = new StringBuilder();
-        sb.append("To: dev@maven.apache.org\n");
-        sb.append("Subject: [VOTE] Release Apache ").append(componentName).append("\n\n");
+        sb.append("To: \"Maven Developers List\" <dev@maven.apache.org>\n");
+        sb.append("Subject: [VOTE] Release ").append(componentName).append("\n\n");
 
         sb.append("Hi,\n\n");
         sb.append("We solved N issues:\n");
-        sb.append("https://issues.apache.org/jira/secure/ReleaseNote.jspa?projectId=12317828&version=TODO\n\n");
+        sb.append("https://github.com/apache/")
+                .append(repoName)
+                .append("/issues?q=is%3Aclosed+milestone%3A")
+                .append(state.getVersion())
+                .append("\n\n");
 
-        sb.append("There are still a couple of issues left in JIRA:\n");
-        sb.append("https://issues.apache.org/jira/issues/?jql=TODO\n\n");
+        sb.append("Changes since the last release:\n");
+        sb.append("https://github.com/apache/")
+                .append(repoName)
+                .append("/compare/")
+                .append(previousTag)
+                .append("...")
+                .append(currentTag)
+                .append("\n\n");
 
         sb.append("Staging repo:\n");
         sb.append(stagingUrl).append("\n");
@@ -107,7 +120,7 @@ public class CallVoteStep extends AbstractStep {
         sb.append(state.getArtifactId())
                 .append("-")
                 .append(state.getVersion())
-                .append("-source-release.zip sha512: <SHA512>\n\n");
+                .append("-source-release.zip sha512: <SHA512SUM>\n\n");
 
         sb.append("Staging site:\n");
         sb.append("https://maven.apache.org/")
@@ -123,16 +136,59 @@ public class CallVoteStep extends AbstractStep {
 
         sb.append("[ ] +1\n");
         sb.append("[ ] +0\n");
-        sb.append("[ ] -1\n\n");
-
-        sb.append("-The Apache Maven team\n");
+        sb.append("[ ] -1\n");
 
         return sb.toString();
     }
 
-    private String formatComponentName(ReleaseState state) {
-        String name = state.getArtifactId().replace("maven-", "").replace("-plugin", " Plugin");
-        return Character.toUpperCase(name.charAt(0)) + name.substring(1) + " " + state.getVersion();
+    /**
+     * Builds the full human-readable component name for use in the subject line,
+     * e.g. "Apache Maven Compiler Plugin version 3.14.0".
+     */
+    private String buildComponentName(ReleaseState state) {
+        String artifactId = state.getArtifactId();
+        String version = state.getVersion();
+
+        // Strip leading "maven-" prefix and trailing "-plugin" suffix, then title-case each word
+        String stripped = artifactId.replaceFirst("^maven-", "").replaceFirst("-plugin$", "");
+        String[] words = stripped.split("-");
+        StringBuilder name = new StringBuilder("Apache Maven");
+        for (String word : words) {
+            if (!word.isEmpty()) {
+                name.append(" ").append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+            }
+        }
+        if (state.getComponentType() == ComponentType.PLUGIN) {
+            name.append(" Plugin");
+        }
+        name.append(" version ").append(version);
+        return name.toString();
+    }
+
+    /**
+     * Extracts the GitHub repository name from a git remote URL.
+     * Handles both SSH ({@code git@github.com:apache/foo.git}) and
+     * HTTPS ({@code https://github.com/apache/foo.git}) formats.
+     * Falls back to the artifactId if the URL cannot be parsed.
+     */
+    static String extractRepoName(String gitRemoteUrl, String fallback) {
+        if (gitRemoteUrl == null || gitRemoteUrl.isBlank()) {
+            return fallback;
+        }
+        // SSH: git@github.com:apache/repo-name.git  → last path segment before .git
+        // HTTPS: https://github.com/apache/repo-name.git
+        String url = gitRemoteUrl.trim();
+        int lastSlash = url.lastIndexOf('/');
+        int lastColon = url.lastIndexOf(':');
+        int sep = Math.max(lastSlash, lastColon);
+        if (sep < 0 || sep >= url.length() - 1) {
+            return fallback;
+        }
+        String repoName = url.substring(sep + 1);
+        if (repoName.endsWith(".git")) {
+            repoName = repoName.substring(0, repoName.length() - 4);
+        }
+        return repoName.isEmpty() ? fallback : repoName;
     }
 
     private String getSiteCategory(ReleaseState state) {

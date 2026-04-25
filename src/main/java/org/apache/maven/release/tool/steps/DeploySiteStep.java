@@ -18,7 +18,6 @@
  */
 package org.apache.maven.release.tool.steps;
 
-import java.nio.file.Files;
 import java.util.List;
 
 import org.apache.maven.release.tool.exec.CommandRunner;
@@ -43,9 +42,10 @@ public class DeploySiteStep extends AbstractStep {
 
     @Override
     public List<String> defaultCommands(ReleaseState state) {
-        if (Files.exists(projectDir(state).resolve("deploySite.sh"))) {
-            return List.of("./deploySite.sh");
-        }
+        // olamy this script is eventually available maybe we could use it?
+        //        if (Files.exists(projectDir(state).resolve("deploySite.sh"))) {
+        //            return List.of("./deploySite.sh");
+        //        }
         return List.of("mvn -Preporting site site:stage", "mvn scm-publish:publish-scm");
     }
 

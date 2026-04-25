@@ -89,6 +89,14 @@ public class PreReleaseChecksStep extends AbstractStep {
         }
         logSuccess("No external SNAPSHOT dependencies");
 
+        // Detect and store the most recent git tag (previous release tag)
+        String previousTag =
+                runner.getOutput(projectDir(state), List.of("git", "describe", "--abbrev=0", "--tags", "HEAD"));
+        if (!previousTag.isBlank()) {
+            state.setPreviousTag(previousTag.trim());
+            logSuccess("Previous release tag detected: " + previousTag.trim());
+        }
+
         return StepResult.ok("All pre-release checks passed.");
     }
 

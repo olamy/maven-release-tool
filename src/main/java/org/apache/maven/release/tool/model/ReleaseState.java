@@ -42,6 +42,7 @@ public class ReleaseState {
     private String stagingRepoId;
     private String stagingRepoUrl;
     private String releaseTag;
+    private String previousTag;
     private Instant estimatedCompletionAt;
     private boolean dryRun;
 
@@ -194,6 +195,14 @@ public class ReleaseState {
 
     public void setReleaseTag(String releaseTag) {
         this.releaseTag = releaseTag;
+    }
+
+    public String getPreviousTag() {
+        return previousTag;
+    }
+
+    public void setPreviousTag(String previousTag) {
+        this.previousTag = previousTag;
     }
 
     public Instant getEstimatedCompletionAt() {
