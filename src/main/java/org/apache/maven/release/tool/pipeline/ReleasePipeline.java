@@ -27,6 +27,7 @@ import org.apache.maven.release.tool.config.ProjectConfig;
 import org.apache.maven.release.tool.model.ReleaseState;
 import org.apache.maven.release.tool.model.StepResult;
 import org.apache.maven.release.tool.model.StepState;
+import org.apache.maven.release.tool.model.StepStatus;
 import org.apache.maven.release.tool.persistence.StateStore;
 import org.apache.maven.release.tool.steps.Step;
 
@@ -136,6 +137,24 @@ public class ReleasePipeline {
             state.advanceToNextStep();
             stateStore.save(state);
         }
+    }
+
+    public boolean goBackToPreviousStep() throws IOException {
+        boolean moved = state.goBackToPreviousStep();
+        if (moved) {
+            // Reset the target step and all subsequent steps to PENDING so that
+            // isComplete() does not fire prematurely when re-executing them.
+            List<StepState> allSteps = state.getSteps();
+            for (int i = state.getCurrentStepIndex(); i < allSteps.size(); i++) {
+                StepState s = allSteps.get(i);
+                s.setStatus(StepStatus.PENDING);
+                s.setStartedAt(null);
+                s.setCompletedAt(null);
+                s.setDurationSeconds(null);
+            }
+            stateStore.save(state);
+        }
+        return moved;
     }
 
     public boolean hasMoreSteps() {

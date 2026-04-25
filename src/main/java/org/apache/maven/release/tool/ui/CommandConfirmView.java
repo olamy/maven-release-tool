@@ -50,7 +50,8 @@ public class CommandConfirmView {
         SKIP,
         DRY_RUN,
         QUIT,
-        EDITED
+        EDITED,
+        GO_BACK
     }
 
     public enum FailureAction {
@@ -133,8 +134,9 @@ public class CommandConfirmView {
                 case "d" -> new ConfirmResult(Action.DRY_RUN, resolved.commands());
                 case "q" -> new ConfirmResult(Action.QUIT, resolved.commands());
                 case "e" -> handleEdit(resolved);
+                case "p" -> new ConfirmResult(Action.GO_BACK, resolved.commands());
                 default -> {
-                    System.out.println("Unknown option. Press Enter to accept, or s/d/e/q.");
+                    System.out.println("Unknown option. Press Enter to accept, or s/d/e/p/q.");
                     yield null;
                 }
             };
@@ -247,6 +249,8 @@ public class CommandConfirmView {
                         Span.raw(" Skip  "),
                         Span.styled("[d]", Style.EMPTY.fg(Color.MAGENTA).addModifier(Modifier.BOLD)),
                         Span.raw(" Dry-run  "),
+                        Span.styled("[p]", Style.EMPTY.fg(Color.BLUE).addModifier(Modifier.BOLD)),
+                        Span.raw(" Previous  "),
                         Span.styled("[q]", Style.EMPTY.fg(Color.RED).addModifier(Modifier.BOLD)),
                         Span.raw(" Quit"))))
                 .build()

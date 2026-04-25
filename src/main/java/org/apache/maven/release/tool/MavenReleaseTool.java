@@ -394,6 +394,13 @@ public class MavenReleaseTool {
                     System.out.println("Skipped: " + step.name());
                     continue;
                 }
+                case GO_BACK -> {
+                    boolean moved = pipeline.goBackToPreviousStep();
+                    if (!moved) {
+                        System.out.println("Already at the first step.");
+                    }
+                    continue;
+                }
                 case DRY_RUN -> {
                     StepResult dryResult = pipeline.dryRunCurrentStep();
                     if (dryResult.message() != null) {

@@ -80,6 +80,14 @@ public class ReleaseState {
         }
     }
 
+    public boolean goBackToPreviousStep() {
+        if (currentStepIndex > 0) {
+            currentStepIndex--;
+            return true;
+        }
+        return false;
+    }
+
     @JsonIgnore
     public boolean isComplete() {
         return currentStepIndex >= steps.size() - 1
