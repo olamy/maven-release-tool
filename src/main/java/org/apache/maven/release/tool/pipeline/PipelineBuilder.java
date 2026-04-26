@@ -27,7 +27,6 @@ import org.apache.maven.release.tool.persistence.StateStore;
 import org.apache.maven.release.tool.steps.CallVoteStep;
 import org.apache.maven.release.tool.steps.CloseStageRepoStep;
 import org.apache.maven.release.tool.steps.CopyToDistStep;
-import org.apache.maven.release.tool.steps.DeploySiteStep;
 import org.apache.maven.release.tool.steps.MavenPerformStep;
 import org.apache.maven.release.tool.steps.MavenPrepareStep;
 import org.apache.maven.release.tool.steps.PreReleaseChecksStep;
@@ -86,7 +85,6 @@ public class PipelineBuilder {
                 new PromoteArtifactsStep(runner),
                 new PublishDocumentationStep(runner),
                 new UpdateSiteStep(runner),
-                new DeploySiteStep(runner),
                 new WaitSyncStep(runner),
                 new SendAnnouncementStep(runner, stateStore),
                 new VerifyDistToolStep(runner));

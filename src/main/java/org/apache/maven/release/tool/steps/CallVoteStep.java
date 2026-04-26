@@ -43,7 +43,7 @@ public class CallVoteStep extends AbstractStep {
 
     @Override
     public String describe() {
-        return "Generate vote email and save to release directory";
+        return "Generate vote email and save to release directory (for core only)";
     }
 
     @Override
