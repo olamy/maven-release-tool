@@ -75,9 +75,9 @@ org.apache.maven.release.tool
 ├── config/                        Per-project command overrides (CommandOverrideStore, CommandResolver, ProjectConfig)
 ├── persistence/                   StateStore — JSON serialization to ~/.m2/maven-release-tool/releases/<id>/
 ├── eta/                           EtaTracker + EtaHistory — median step durations from past releases
-├── exec/                          CommandRunner — ProcessBuilder-based command execution (no shell involved)
+├── exec/                          CommandRunner + TeeOutputCapture — ProcessBuilder-based execution (no shell involved)
 ├── integration/                   NexusClient (Jetty HTTP Client) for Nexus staging API
-└── ui/                            ReleaseDashboard (styled stdout) + CommandConfirmView (interactive prompts)
+└── ui/                            ReleaseDashboard, StepOutputView, CommandConfirmView (interactive prompts)
 ```
 
 ### Key Design Decisions
@@ -97,6 +97,14 @@ org.apache.maven.release.tool
   failure→ignore) the terminal is cleared and the dashboard is re-rendered with updated
   step statuses and recalculated ETAs. Uses ANSI `\033[H\033[2J` escape sequence
   via `ReleaseDashboard.clearAndRender()` (same pattern as `ReleaseSelector`).
+- **Step output view** — after each step execution (success or failure), the last 10 lines
+  of that step's output are shown below the dashboard. `TeeOutputCapture` streams output
+  to stdout during execution and captures it for replay after the screen clear. Steps that
+  return content via `StepResult.message()` (e.g. `CallVoteStep`) are buffered via
+  `TeeOutputCapture.buffer()`. Interactive controls via JLine raw mode:
+  - **Ctrl+E** — expand to full output
+  - **Ctrl+R** — collapse back to last 10 lines
+  - **any other key** — dismiss and continue to the next step
 - `--version` and `--next-version` are both optional on `start`. Version is auto-detected
   from pom.xml (strips `-SNAPSHOT`). The release plugin prompts for anything not provided.
 

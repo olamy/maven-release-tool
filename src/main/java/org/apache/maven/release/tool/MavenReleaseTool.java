@@ -29,6 +29,7 @@ import org.apache.maven.release.tool.config.ProjectConfig;
 import org.apache.maven.release.tool.eta.EtaHistory;
 import org.apache.maven.release.tool.eta.EtaTracker;
 import org.apache.maven.release.tool.exec.CommandRunner;
+import org.apache.maven.release.tool.exec.TeeOutputCapture;
 import org.apache.maven.release.tool.model.ComponentType;
 import org.apache.maven.release.tool.model.ReleaseState;
 import org.apache.maven.release.tool.model.StepResult;
@@ -41,6 +42,7 @@ import org.apache.maven.release.tool.steps.Step;
 import org.apache.maven.release.tool.ui.CommandConfirmView;
 import org.apache.maven.release.tool.ui.ReleaseDashboard;
 import org.apache.maven.release.tool.ui.ReleaseSelector;
+import org.apache.maven.release.tool.ui.StepOutputView;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -96,7 +98,8 @@ public class MavenReleaseTool {
         public void run() {
             try {
                 StateStore stateStore = new StateStore();
-                CommandRunner runner = new CommandRunner();
+                TeeOutputCapture capture = new TeeOutputCapture();
+                CommandRunner runner = new CommandRunner(capture);
                 Path absProjectDir = projectDir.toAbsolutePath();
 
                 if (component == null) {
@@ -147,7 +150,7 @@ public class MavenReleaseTool {
                 System.out.println("Steps: " + steps.size());
                 System.out.println();
 
-                runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig);
+                runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig, capture);
 
             } catch (IOException e) {
                 System.err.println("Error: " + e.getMessage());
@@ -317,7 +320,8 @@ public class MavenReleaseTool {
             return;
         }
 
-        CommandRunner runner = new CommandRunner();
+        TeeOutputCapture capture = new TeeOutputCapture();
+        CommandRunner runner = new CommandRunner(capture);
         CommandOverrideStore overrideStore = new CommandOverrideStore(stateStore.getBaseDir());
         ProjectConfig projectConfig = overrideStore.load(state.getGitRemoteUrl());
 
@@ -343,7 +347,7 @@ public class MavenReleaseTool {
             stateStore.save(state);
         }
 
-        runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig);
+        runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig, capture);
     }
 
     private static void runPipeline(
@@ -352,11 +356,13 @@ public class MavenReleaseTool {
             EtaHistory etaHistory,
             StateStore stateStore,
             CommandOverrideStore overrideStore,
-            ProjectConfig projectConfig)
+            ProjectConfig projectConfig,
+            TeeOutputCapture capture)
             throws IOException {
 
         CommandConfirmView confirmView = new CommandConfirmView();
         ReleaseDashboard dashboard = new ReleaseDashboard(pipeline.getState(), pipeline.getSteps(), etaTracker);
+        StepOutputView outputView = new StepOutputView();
 
         dashboard.clearAndRender();
 
@@ -421,10 +427,11 @@ public class MavenReleaseTool {
                 }
             }
 
+            capture.reset();
             StepResult result = pipeline.executeCurrentStep(commandsToRun);
 
             if (result.message() != null) {
-                System.out.println(result.message());
+                capture.buffer(result.message());
             }
 
             if (result.succeeded()) {
@@ -437,8 +444,11 @@ public class MavenReleaseTool {
                     etaTracker.recordCompletedStep(pipeline.getState(), stepState);
                 }
                 dashboard.clearAndRender();
+                outputView.show(dashboard, capture.getLines(), step.name());
             } else {
-                System.out.println("Step failed: " + result.message());
+                dashboard.clearAndRender();
+                outputView.show(dashboard, capture.getLines(), step.name());
+
                 boolean isReleaseStep = step.name().startsWith("maven-release-");
 
                 CommandConfirmView.FailureAction failureAction =
