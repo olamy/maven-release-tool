@@ -396,7 +396,9 @@ public class MavenReleaseTool {
                 }
                 case GO_BACK -> {
                     boolean moved = pipeline.goBackToPreviousStep();
-                    if (!moved) {
+                    if (moved) {
+                        dashboard.clearAndRender();
+                    } else {
                         System.out.println("Already at the first step.");
                     }
                     continue;
