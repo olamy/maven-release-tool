@@ -34,6 +34,7 @@ Built with [Tamboui](https://github.com/tamboui/tamboui) for terminal UI and [Pi
 - **ETA tracking** — learns step durations from past releases, projects remaining time
 - **Dry-run** — global (`--dry-run`) runs the full pipeline showing commands without executing; per-step (`d` key) previews a single step
 - **Rollback handling** — on `release:prepare`/`release:perform` failure, offers Retry / Rollback (`release:rollback` + `release:clean`) / Quit
+- **Step output view** — after each step, the last 10 lines of output are shown below the dashboard; press **Ctrl+E** to expand to full output, **Ctrl+R** to collapse, any other key to continue
 - **Email generation** — vote, vote result, and announcement emails pre-filled and saved to the release directory
 
 ## Requirements
@@ -164,6 +165,24 @@ On failure of `release:prepare` or `release:perform`:
   [b] Rollback (mvn release:rollback + release:clean)
   [q] Save & quit (fix manually, resume later)
 ```
+
+### After step execution
+
+Once a step completes (success or failure), the dashboard is refreshed and the last 10 lines of that step's output appear below it:
+
+```
+▸ maven-release-prepare  [last 10 of 247 lines]
+  [INFO] Tagging release with the label maven-compiler-plugin-3.14.0...
+  [INFO] Executing: /bin/sh -c cd ...
+  ...
+  [INFO] BUILD SUCCESS
+
+  Ctrl+E expand  ·  any key continue
+```
+
+- **Ctrl+E** — expand to full output
+- **Ctrl+R** — collapse back to the last 10 lines
+- **any other key** — dismiss and confirm the next step
 
 ## Per-Project Command Overrides
 
