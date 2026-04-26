@@ -358,7 +358,7 @@ public class MavenReleaseTool {
         CommandConfirmView confirmView = new CommandConfirmView();
         ReleaseDashboard dashboard = new ReleaseDashboard(pipeline.getState(), pipeline.getSteps(), etaTracker);
 
-        dashboard.render();
+        dashboard.clearAndRender();
 
         while (pipeline.hasMoreSteps()) {
             Step step = pipeline.getCurrentStep();
@@ -391,7 +391,7 @@ public class MavenReleaseTool {
                 }
                 case SKIP -> {
                     pipeline.skipCurrentStep();
-                    System.out.println("Skipped: " + step.name());
+                    dashboard.clearAndRender();
                     continue;
                 }
                 case GO_BACK -> {
@@ -434,6 +434,7 @@ public class MavenReleaseTool {
                 if (stepState.getDurationSeconds() != null) {
                     etaTracker.recordCompletedStep(pipeline.getState(), stepState);
                 }
+                dashboard.clearAndRender();
             } else {
                 System.out.println("Step failed: " + result.message());
                 boolean isReleaseStep = step.name().startsWith("maven-release-");
@@ -445,12 +446,13 @@ public class MavenReleaseTool {
                     case RETRY -> {
                         stepState.setStatus(StepStatus.PENDING);
                         pipeline.save();
+                        dashboard.clearAndRender();
                     }
                     case IGNORE -> {
-                        System.out.println("Ignoring failure, continuing to next step.");
                         stepState.markSkipped();
                         pipeline.getState().advanceToNextStep();
                         pipeline.save();
+                        dashboard.clearAndRender();
                     }
                     case ROLLBACK -> {
                         System.out.println("Running mvn release:rollback...");
@@ -474,7 +476,7 @@ public class MavenReleaseTool {
         }
 
         etaHistory.save();
-        dashboard.render();
+        dashboard.clearAndRender();
         System.out.println("\n=== Release complete! ===");
     }
 }

@@ -61,6 +61,12 @@ public class ReleaseDashboard implements AutoCloseable {
         printProgressBar();
     }
 
+    public void clearAndRender() {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+        render();
+    }
+
     private void printHeader() {
         String version = state.getVersion() != null ? " " + state.getVersion() : "";
         String title = "Maven Release Tool — " + state.getArtifactId() + version;

@@ -93,6 +93,10 @@ org.apache.maven.release.tool
   `resume` command picks up where it left off.
 - **Rollback handling** on `release:prepare`/`release:perform` failure offers
   Retry/Rollback(`release:rollback` + `release:clean`)/Quit.
+- **Dashboard auto-refresh** — after every step decision (success, skip, failure→retry,
+  failure→ignore) the terminal is cleared and the dashboard is re-rendered with updated
+  step statuses and recalculated ETAs. Uses ANSI `\033[H\033[2J` escape sequence
+  via `ReleaseDashboard.clearAndRender()` (same pattern as `ReleaseSelector`).
 - `--version` and `--next-version` are both optional on `start`. Version is auto-detected
   from pom.xml (strips `-SNAPSHOT`). The release plugin prompts for anything not provided.
 
