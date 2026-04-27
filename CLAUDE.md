@@ -55,6 +55,22 @@ java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar resume --dashboard
   `.md`, and `.xml` file must start with the ASF license block or RAT will fail the build.
   For Markdown files use an HTML comment `<!-- ... -->` wrapping the license.
 
+## Picocli Help Options
+
+Subcommands (`start`, `resume`, `list`, `clean`, `stats`) each declare an explicit help option:
+
+```java
+@Option(names = {"-h", "--help"}, usageHelp = true, description = "Show this help message and exit.")
+boolean helpRequested;
+```
+
+**Do NOT replace this with `mixinStandardHelpOptions = true`** on the `@Command` annotation.
+In picocli 4.7.6, `mixinStandardHelpOptions` checks for name overlap before adding the mixin;
+if any of `{-h, --help, -V, --version}` already exist in the command, the entire mixin is
+**silently skipped** — including `-h`/`--help`. Several subcommands define `--version` for the
+Maven release version to be released, causing this collision. The explicit `@Option` approach
+adds only the help flag without the conflicting `-V`/`--version`.
+
 ## Architecture
 
 This is a TUI-based CLI tool that supervises the full Apache Maven release process.

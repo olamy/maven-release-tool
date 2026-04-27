@@ -67,6 +67,17 @@ java -jar target/maven-release-tool-0.1.0-SNAPSHOT.jar --help
 
 ## Usage
 
+Use `-h` or `--help` on any subcommand to see its options:
+
+```bash
+maven-release-tool --help
+maven-release-tool start --help
+maven-release-tool resume --help
+maven-release-tool list --help
+maven-release-tool clean --help
+maven-release-tool stats --help
+```
+
 ### Start a new release
 
 ```bash
@@ -186,7 +197,7 @@ Once a step completes (success or failure), the dashboard is refreshed and the l
 
 ## Per-Project Command Overrides
 
-Each project can have custom commands saved in `~/.maven/release-tool/projects/<name>/commands.json`.
+Each project can have custom commands saved in `~/.m2/maven-release-tool/projects/<name>/commands.json`.
 Projects are identified by their git remote URL.
 
 When you edit a command during a release, you're prompted to save it:
@@ -206,10 +217,10 @@ Commands support variable interpolation: `${version}`, `${tag}`, `${nextVersion}
 
 ## Storage
 
-All data is stored under `~/.maven/release-tool/`:
+All data is stored under `~/.m2/maven-release-tool/`:
 
 ```
-~/.maven/release-tool/
+~/.m2/maven-release-tool/
 ├── projects/                            Per-project command overrides
 │   └── apache-maven-compiler-plugin/
 │       └── commands.json
