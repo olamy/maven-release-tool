@@ -52,6 +52,14 @@ import picocli.CommandLine.Option;
         mixinStandardHelpOptions = true,
         version = "0.1.0-SNAPSHOT",
         description = "TUI-based release supervisor for Apache Maven components",
+        footer = {
+            "",
+            "Data is stored under: ~/.m2/maven-release-tool/",
+            "  releases/<id>/          release state, vote/announcement emails, step logs",
+            "  projects/<name>/        per-project command overrides",
+            "  history.json            ETA timing from past releases",
+            "  config.json             user preferences"
+        },
         subcommands = {
             MavenReleaseTool.StartCommand.class,
             MavenReleaseTool.ResumeCommand.class,
@@ -66,8 +74,14 @@ public class MavenReleaseTool {
         System.exit(exitCode);
     }
 
-    @Command(name = "start", description = "Start a new release")
+    @Command(name = "start", description = "Start a new release from current directory")
     static class StartCommand implements Runnable {
+
+        @Option(
+                names = {"-h", "--help"},
+                usageHelp = true,
+                description = "Show this help message and exit.")
+        boolean helpRequested;
 
         @Option(
                 names = "--version",
@@ -150,7 +164,7 @@ public class MavenReleaseTool {
                 System.out.println("Steps: " + steps.size());
                 System.out.println();
 
-                runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig, capture);
+                runPipeline(pipeline, etaTracker, etaHistory, overrideStore, projectConfig, capture);
 
             } catch (IOException e) {
                 System.err.println("Error: " + e.getMessage());
@@ -183,6 +197,12 @@ public class MavenReleaseTool {
     @Command(name = "resume", description = "Resume an in-progress release")
     static class ResumeCommand implements Runnable {
 
+        @Option(
+                names = {"-h", "--help"},
+                usageHelp = true,
+                description = "Show this help message and exit.")
+        boolean helpRequested;
+
         @Option(names = "--component", description = "Artifact ID (optional when --dashboard is used)")
         String component;
 
@@ -213,6 +233,12 @@ public class MavenReleaseTool {
 
     @Command(name = "list", description = "List in-progress releases")
     static class ListCommand implements Runnable {
+
+        @Option(
+                names = {"-h", "--help"},
+                usageHelp = true,
+                description = "Show this help message and exit.")
+        boolean helpRequested;
 
         @Option(names = "--dashboard", description = "Open interactive dashboard to select a release")
         boolean dashboard;
@@ -252,6 +278,12 @@ public class MavenReleaseTool {
     @Command(name = "clean", description = "Clean up a completed/abandoned release")
     static class CleanCommand implements Runnable {
 
+        @Option(
+                names = {"-h", "--help"},
+                usageHelp = true,
+                description = "Show this help message and exit.")
+        boolean helpRequested;
+
         @Option(names = "--component", required = true, description = "Artifact ID")
         String component;
 
@@ -272,6 +304,12 @@ public class MavenReleaseTool {
 
     @Command(name = "stats", description = "Show ETA history and statistics")
     static class StatsCommand implements Runnable {
+
+        @Option(
+                names = {"-h", "--help"},
+                usageHelp = true,
+                description = "Show this help message and exit.")
+        boolean helpRequested;
 
         @Option(names = "--type", description = "Filter by component type")
         ComponentType type;
@@ -347,14 +385,13 @@ public class MavenReleaseTool {
             stateStore.save(state);
         }
 
-        runPipeline(pipeline, etaTracker, etaHistory, stateStore, overrideStore, projectConfig, capture);
+        runPipeline(pipeline, etaTracker, etaHistory, overrideStore, projectConfig, capture);
     }
 
     private static void runPipeline(
             ReleasePipeline pipeline,
             EtaTracker etaTracker,
             EtaHistory etaHistory,
-            StateStore stateStore,
             CommandOverrideStore overrideStore,
             ProjectConfig projectConfig,
             TeeOutputCapture capture)
