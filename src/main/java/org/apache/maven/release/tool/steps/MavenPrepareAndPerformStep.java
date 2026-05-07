@@ -49,20 +49,21 @@ public class MavenPrepareAndPerformStep extends AbstractStep {
 
     @Override
     public List<String> defaultCommands(ReleaseState state) {
-        List<String> prepareArgs = new ArrayList<>();
-        prepareArgs.add("mvn");
-        prepareArgs.add("release:prepare");
+        List<String> args = new ArrayList<>();
+        args.add("mvn");
+        args.add("release:prepare");
+        args.add("release:perform");
         if (state.getVersion() != null) {
-            prepareArgs.add("-DreleaseVersion=" + state.getVersion());
+            args.add("-DreleaseVersion=" + state.getVersion());
         }
         if (state.getNextVersion() != null) {
-            prepareArgs.add("-DdevelopmentVersion=" + state.getNextVersion());
+            args.add("-DdevelopmentVersion=" + state.getNextVersion());
         }
         if (state.getReleaseTag() != null) {
-            prepareArgs.add("-Dtag=" + state.getReleaseTag());
+            args.add("-Dtag=" + state.getReleaseTag());
         }
 
-        return List.of(String.join(" ", prepareArgs), "mvn release:perform");
+        return List.of(String.join(" ", args));
     }
 
     @Override

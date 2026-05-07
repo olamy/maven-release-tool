@@ -45,9 +45,9 @@ class MavenPrepareAndPerformStepTest {
 
         List<String> commands = step.defaultCommands(state);
 
-        assertEquals(2, commands.size());
-        assertTrue(commands.get(0).contains("release:prepare"), "first command should be release:prepare");
-        assertTrue(commands.get(1).contains("release:perform"), "second command should be release:perform");
+        assertEquals(1, commands.size());
+        assertTrue(commands.get(0).contains("release:prepare"), "command should contain release:prepare");
+        assertTrue(commands.get(0).contains("release:perform"), "command should contain release:perform");
     }
 
     @Test
@@ -59,12 +59,10 @@ class MavenPrepareAndPerformStepTest {
 
         List<String> commands = step.defaultCommands(state);
 
-        String prepareCmd = commands.get(0);
-        assertTrue(prepareCmd.contains("-DreleaseVersion=3.0.0"), "prepare command should contain releaseVersion");
-        assertTrue(
-                prepareCmd.contains("-DdevelopmentVersion=3.0.1-SNAPSHOT"),
-                "prepare command should contain developmentVersion");
-        assertTrue(prepareCmd.contains("-Dtag=my-plugin-3.0.0"), "prepare command should contain tag");
+        String cmd = commands.get(0);
+        assertTrue(cmd.contains("-DreleaseVersion=3.0.0"), "command should contain releaseVersion");
+        assertTrue(cmd.contains("-DdevelopmentVersion=3.0.1-SNAPSHOT"), "command should contain developmentVersion");
+        assertTrue(cmd.contains("-Dtag=my-plugin-3.0.0"), "command should contain tag");
     }
 
     @Test
@@ -73,34 +71,30 @@ class MavenPrepareAndPerformStepTest {
 
         List<String> commands = step.defaultCommands(state);
 
-        assertEquals("mvn release:prepare", commands.get(0));
-        assertEquals("mvn release:perform", commands.get(1));
+        assertEquals("mvn release:prepare release:perform", commands.get(0));
     }
 
     @Test
-    void dryRunAppendsDryRunFlagToEachCommand() {
+    void dryRunAppendsDryRunFlagToCommand() {
         ReleaseState state =
                 ReleaseState.create("my-plugin", "org.apache.maven", "3.0.0", ComponentType.PLUGIN, Path.of("/tmp"));
-        List<String> original = List.of("mvn release:prepare -DreleaseVersion=3.0.0", "mvn release:perform");
+        List<String> original = List.of("mvn release:prepare release:perform -DreleaseVersion=3.0.0");
 
         List<String> dryRunCommands = collectDryRunCommands(state, original);
 
-        assertTrue(dryRunCommands.get(0).endsWith("-DdryRun=true"), "prepare should have -DdryRun=true appended");
-        assertTrue(dryRunCommands.get(1).endsWith("-DdryRun=true"), "perform should have -DdryRun=true appended");
+        assertEquals(1, dryRunCommands.size());
+        assertTrue(dryRunCommands.get(0).endsWith("-DdryRun=true"), "command should have -DdryRun=true appended");
     }
 
     @Test
     void dryRunDoesNotDuplicateDryRunFlag() {
         ReleaseState state =
                 ReleaseState.create("my-plugin", "org.apache.maven", "3.0.0", ComponentType.PLUGIN, Path.of("/tmp"));
-        List<String> commands = List.of("mvn release:prepare -DdryRun=true", "mvn release:perform -DdryRun=true");
+        List<String> commands = List.of("mvn release:prepare release:perform -DdryRun=true");
 
         List<String> dryRunCommands = collectDryRunCommands(state, commands);
 
-        assertEquals(
-                1, countOccurrences(dryRunCommands.get(0), "-DdryRun=true"), "should not duplicate flag in prepare");
-        assertEquals(
-                1, countOccurrences(dryRunCommands.get(1), "-DdryRun=true"), "should not duplicate flag in perform");
+        assertEquals(1, countOccurrences(dryRunCommands.get(0), "-DdryRun=true"), "should not duplicate flag");
     }
 
     /**

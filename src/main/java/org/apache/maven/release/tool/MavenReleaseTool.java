@@ -65,6 +65,7 @@ import picocli.CommandLine.Option;
             MavenReleaseTool.StartCommand.class,
             MavenReleaseTool.ResumeCommand.class,
             MavenReleaseTool.ListCommand.class,
+            MavenReleaseTool.ManageCommand.class,
             MavenReleaseTool.CleanCommand.class,
             MavenReleaseTool.StatsCommand.class
         })
@@ -270,6 +271,59 @@ public class MavenReleaseTool {
                                 r.getCurrentStepIndex() + 1,
                                 r.getSteps().size(),
                                 r.getCurrentStep() != null ? r.getCurrentStep().getStatus() : "");
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error: " + e.getMessage());
+            }
+        }
+    }
+
+    @Command(name = "manage", description = "Interactively manage in-progress releases (resume or delete)")
+    static class ManageCommand implements Runnable {
+
+        @Option(
+                names = {"-h", "--help"},
+                usageHelp = true,
+                description = "Show this help message and exit.")
+        boolean helpRequested;
+
+        @Override
+        public void run() {
+            try {
+                StateStore stateStore = new StateStore();
+                ReleaseSelector selector = new ReleaseSelector();
+
+                while (true) {
+                    List<ReleaseState> releases = stateStore.listAll();
+                    if (releases.isEmpty()) {
+                        System.out.println("No in-progress releases.");
+                        return;
+                    }
+
+                    ReleaseSelector.ManageResult result = selector.manage(releases);
+
+                    if (result == null || result.action() == ReleaseSelector.ManageAction.QUIT) {
+                        return;
+                    }
+
+                    if (result.action() == ReleaseSelector.ManageAction.RESUME) {
+                        ReleaseState selected = result.release();
+                        resumeRelease(stateStore, selected.getArtifactId(), selected.getVersion());
+                        return;
+                    }
+
+                    if (result.action() == ReleaseSelector.ManageAction.DELETE) {
+                        ReleaseState selected = result.release();
+                        System.out.print("Delete " + selected.getReleaseId() + "? [y/N] ");
+                        System.out.flush();
+                        int ch = System.in.read();
+                        System.out.println();
+                        if (ch == 'y' || ch == 'Y') {
+                            stateStore.delete(selected.getReleaseId());
+                            System.out.println("Deleted " + selected.getReleaseId() + ".");
+                        }
+                        // loop back to show updated list
                     }
                 }
             } catch (IOException e) {

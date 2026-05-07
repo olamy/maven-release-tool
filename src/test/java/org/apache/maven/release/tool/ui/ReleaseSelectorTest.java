@@ -110,6 +110,29 @@ class ReleaseSelectorTest {
     }
 
     @Test
+    void renderForManageShowsDeleteHint() {
+        ReleaseState r =
+                ReleaseState.create("maven-compiler-plugin", null, "3.14.0", ComponentType.PLUGIN, Path.of("/tmp"));
+        r.getSteps().add(new StepState("pre-release-checks"));
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        try {
+            System.setOut(new PrintStream(baos));
+            ReleaseSelector selector = new ReleaseSelector();
+            selector.renderForManage(List.of(r), 0);
+        } finally {
+            System.setOut(original);
+        }
+
+        String output = baos.toString();
+        assertTrue(output.contains("Delete"), "Should show Delete hint in manage mode");
+        assertTrue(output.contains("Resume"), "Should still show Resume hint");
+        assertTrue(output.contains("Navigate"), "Should still show Navigate hint");
+        assertTrue(output.contains("maven-compiler-plugin-3.14.0"), "Should show release ID");
+    }
+
+    @Test
     void renderShowsEmptyMessage() {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream original = System.out;

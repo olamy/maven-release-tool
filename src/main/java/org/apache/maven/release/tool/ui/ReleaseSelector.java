@@ -49,6 +49,14 @@ public class ReleaseSelector {
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 
+    public enum ManageAction {
+        RESUME,
+        DELETE,
+        QUIT
+    }
+
+    public record ManageResult(ManageAction action, ReleaseState release) {}
+
     /**
      * Shows an interactive list of releases and returns the one selected by the user,
      * or {@code null} if the user quit without selecting.
@@ -198,6 +206,96 @@ public class ReleaseSelector {
                         Span.styled("[Enter]", Style.EMPTY.fg(Color.GREEN).addModifier(Modifier.BOLD)),
                         Span.raw(" Resume  "),
                         Span.styled("[q/Esc]", Style.EMPTY.fg(Color.RED).addModifier(Modifier.BOLD)),
+                        Span.raw(" Quit"))))
+                .build()
+                .render(buf.area(), buf);
+        System.out.println(buf.toAnsiStringTrimmed());
+    }
+
+    /**
+     * Shows an interactive manage view where the user can resume or delete a release.
+     * Returns a {@link ManageResult} describing the chosen action and the selected release,
+     * or {@code null} if the list is empty or the user quit.
+     */
+    public ManageResult manage(List<ReleaseState> releases) throws IOException {
+        if (releases.isEmpty()) {
+            System.out.println("No in-progress releases.");
+            return null;
+        }
+
+        try (Terminal terminal =
+                TerminalBuilder.builder().system(true).jansi(true).build()) {
+            terminal.enterRawMode();
+            NonBlockingReader reader = terminal.reader();
+
+            int selectedIndex = 0;
+
+            while (true) {
+                renderForManage(releases, selectedIndex);
+
+                int ch = reader.read();
+                if (ch == -1) {
+                    return null;
+                }
+
+                if (ch == 27) {
+                    int next = reader.read(50);
+                    if (next == '[') {
+                        int arrow = reader.read(50);
+                        switch (arrow) {
+                            case 'A':
+                                selectedIndex = Math.max(0, selectedIndex - 1);
+                                break;
+                            case 'B':
+                                selectedIndex = Math.min(releases.size() - 1, selectedIndex + 1);
+                                break;
+                            default:
+                                break;
+                        }
+                    } else if (next == -1 || next == 27) {
+                        return new ManageResult(ManageAction.QUIT, null);
+                    }
+                } else if (ch == 'q' || ch == 'Q') {
+                    return new ManageResult(ManageAction.QUIT, null);
+                } else if (ch == '\r' || ch == '\n') {
+                    return new ManageResult(ManageAction.RESUME, releases.get(selectedIndex));
+                } else if (ch == 'd' || ch == 'D') {
+                    return new ManageResult(ManageAction.DELETE, releases.get(selectedIndex));
+                } else if (ch == 'k' || ch == 'K') {
+                    selectedIndex = Math.max(0, selectedIndex - 1);
+                } else if (ch == 'j' || ch == 'J') {
+                    selectedIndex = Math.min(releases.size() - 1, selectedIndex + 1);
+                }
+            }
+        }
+    }
+
+    void renderForManage(List<ReleaseState> releases, int selectedIndex) {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+
+        printHeader();
+        System.out.println();
+
+        for (int i = 0; i < releases.size(); i++) {
+            printRelease(releases.get(i), i == selectedIndex);
+        }
+
+        System.out.println();
+        printManageHelpLine();
+    }
+
+    private void printManageHelpLine() {
+        Buffer buf = Buffer.empty(Rect.of(WIDTH, 1));
+        Paragraph.builder()
+                .text(Text.from(Line.from(
+                        Span.styled("[↑↓/jk]", Style.EMPTY.fg(Color.CYAN).addModifier(Modifier.BOLD)),
+                        Span.raw(" Navigate  "),
+                        Span.styled("[Enter]", Style.EMPTY.fg(Color.GREEN).addModifier(Modifier.BOLD)),
+                        Span.raw(" Resume  "),
+                        Span.styled("[d]", Style.EMPTY.fg(Color.RED).addModifier(Modifier.BOLD)),
+                        Span.raw(" Delete  "),
+                        Span.styled("[q/Esc]", Style.EMPTY.fg(Color.DARK_GRAY).addModifier(Modifier.BOLD)),
                         Span.raw(" Quit"))))
                 .build()
                 .render(buf.area(), buf);
