@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.maven.release.tool.config.CommandOverrideStore;
 import org.apache.maven.release.tool.config.CommandResolver;
+import org.apache.maven.release.tool.config.GlobalConfig;
 import org.apache.maven.release.tool.config.ProjectConfig;
 import org.apache.maven.release.tool.model.ReleaseState;
 import org.apache.maven.release.tool.model.StepResult;
@@ -39,6 +40,7 @@ public class ReleasePipeline {
     private final CommandResolver commandResolver;
     private final CommandOverrideStore overrideStore;
     private final ProjectConfig projectConfig;
+    private final GlobalConfig globalConfig;
 
     public ReleasePipeline(
             List<Step> steps,
@@ -46,12 +48,23 @@ public class ReleasePipeline {
             StateStore stateStore,
             CommandOverrideStore overrideStore,
             ProjectConfig projectConfig) {
+        this(steps, state, stateStore, overrideStore, projectConfig, null);
+    }
+
+    public ReleasePipeline(
+            List<Step> steps,
+            ReleaseState state,
+            StateStore stateStore,
+            CommandOverrideStore overrideStore,
+            ProjectConfig projectConfig,
+            GlobalConfig globalConfig) {
         this.steps = steps;
         this.state = state;
         this.stateStore = stateStore;
         this.overrideStore = overrideStore;
         this.projectConfig = projectConfig;
-        this.commandResolver = new CommandResolver(projectConfig);
+        this.globalConfig = globalConfig;
+        this.commandResolver = new CommandResolver(projectConfig, globalConfig);
 
         if (state.getSteps().isEmpty()) {
             for (Step step : steps) {

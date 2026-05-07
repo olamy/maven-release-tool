@@ -29,12 +29,15 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class CommandOverrideStore {
 
     private static final String COMMANDS_FILE = "commands.json";
+    private static final String GLOBAL_COMMANDS_FILE = "global-commands.json";
 
     private final Path projectsDir;
+    private final Path baseDir;
     private final ObjectMapper mapper;
 
     public CommandOverrideStore(Path baseDir) {
         this.projectsDir = baseDir.resolve("projects");
+        this.baseDir = baseDir;
         this.mapper = new ObjectMapper();
         this.mapper.registerModule(new JavaTimeModule());
         this.mapper.enable(SerializationFeature.INDENT_OUTPUT);
@@ -53,6 +56,19 @@ public class CommandOverrideStore {
         Path projectDir = getProjectDir(config.getGitRemoteUrl());
         Files.createDirectories(projectDir);
         mapper.writeValue(projectDir.resolve(COMMANDS_FILE).toFile(), config);
+    }
+
+    public GlobalConfig loadGlobal() throws IOException {
+        Path globalFile = baseDir.resolve(GLOBAL_COMMANDS_FILE);
+        if (!Files.exists(globalFile)) {
+            return new GlobalConfig();
+        }
+        return mapper.readValue(globalFile.toFile(), GlobalConfig.class);
+    }
+
+    public void saveGlobal(GlobalConfig config) throws IOException {
+        Files.createDirectories(baseDir);
+        mapper.writeValue(baseDir.resolve(GLOBAL_COMMANDS_FILE).toFile(), config);
     }
 
     private Path getProjectDir(String gitRemoteUrl) {

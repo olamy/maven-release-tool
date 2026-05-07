@@ -27,9 +27,15 @@ import org.apache.maven.release.tool.steps.Step;
 public class CommandResolver {
 
     private final ProjectConfig projectConfig;
+    private final GlobalConfig globalConfig;
 
     public CommandResolver(ProjectConfig projectConfig) {
+        this(projectConfig, null);
+    }
+
+    public CommandResolver(ProjectConfig projectConfig, GlobalConfig globalConfig) {
         this.projectConfig = projectConfig;
+        this.globalConfig = globalConfig;
     }
 
     public ResolvedCommands resolve(Step step, ReleaseState state) {
@@ -40,6 +46,10 @@ public class CommandResolver {
             CommandOverride override = projectConfig.getOverride(step.name());
             commands = interpolate(override.commands(), state);
             source = "project override" + (override.reason() != null ? " (" + override.reason() + ")" : "");
+        } else if (globalConfig != null && globalConfig.hasOverride(step.name())) {
+            CommandOverride override = globalConfig.getOverride(step.name());
+            commands = interpolate(override.commands(), state);
+            source = "global override" + (override.reason() != null ? " (" + override.reason() + ")" : "");
         } else {
             commands = step.defaultCommands(state);
             source = "default (" + state.getComponentType() + ")";

@@ -43,8 +43,7 @@ class PipelineBuilderTest {
         List<String> names = steps.stream().map(Step::name).toList();
 
         assertTrue(names.contains("pre-release-checks"));
-        assertTrue(names.contains("maven-release-prepare"));
-        assertTrue(names.contains("maven-release-perform"));
+        assertTrue(names.contains("maven-release-prepare-and-perform"));
         assertTrue(names.contains("call-vote"));
         assertTrue(names.contains("wait-for-vote"));
         assertTrue(names.contains("promote-artifacts"));

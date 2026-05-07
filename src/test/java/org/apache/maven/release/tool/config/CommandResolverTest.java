@@ -19,12 +19,16 @@
 package org.apache.maven.release.tool.config;
 
 import java.nio.file.Path;
+import java.util.List;
 
+import org.apache.maven.release.tool.exec.CommandRunner;
 import org.apache.maven.release.tool.model.ComponentType;
 import org.apache.maven.release.tool.model.ReleaseState;
+import org.apache.maven.release.tool.steps.MavenPrepareAndPerformStep;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandResolverTest {
 
@@ -62,5 +66,64 @@ class CommandResolverTest {
 
         String result = CommandResolver.interpolate("echo ${unknown} and ${version}", state);
         assertEquals("echo ${unknown} and 1.0", result);
+    }
+
+    @Test
+    void globalOverrideIsUsedWhenNoProjectOverride() {
+        ReleaseState state =
+                ReleaseState.create("my-plugin", "org.apache.maven", "1.0", ComponentType.PLUGIN, Path.of("/tmp"));
+
+        GlobalConfig globalConfig = new GlobalConfig();
+        globalConfig.setOverride(
+                "maven-release-prepare-and-perform",
+                new CommandOverride(List.of("mvn release:prepare -Pglobal", "mvn release:perform -Pglobal"), null));
+
+        CommandResolver resolver = new CommandResolver(null, globalConfig);
+        CommandResolver.ResolvedCommands resolved =
+                resolver.resolve(new MavenPrepareAndPerformStep(new CommandRunner()), state);
+
+        assertEquals(List.of("mvn release:prepare -Pglobal", "mvn release:perform -Pglobal"), resolved.commands());
+        assertTrue(resolved.source().startsWith("global override"), "source should indicate global override");
+    }
+
+    @Test
+    void projectOverrideTakesPrecedenceOverGlobalOverride() {
+        ReleaseState state =
+                ReleaseState.create("my-plugin", "org.apache.maven", "1.0", ComponentType.PLUGIN, Path.of("/tmp"));
+
+        GlobalConfig globalConfig = new GlobalConfig();
+        globalConfig.setOverride(
+                "maven-release-prepare-and-perform",
+                new CommandOverride(List.of("mvn release:prepare -Pglobal"), null));
+
+        ProjectConfig projectConfig = new ProjectConfig("git@example.com/repo.git");
+        projectConfig.setOverride(
+                "maven-release-prepare-and-perform",
+                new CommandOverride(List.of("mvn release:prepare -Pproject"), null));
+
+        CommandResolver resolver = new CommandResolver(projectConfig, globalConfig);
+        CommandResolver.ResolvedCommands resolved =
+                resolver.resolve(new MavenPrepareAndPerformStep(new CommandRunner()), state);
+
+        assertEquals(List.of("mvn release:prepare -Pproject"), resolved.commands());
+        assertTrue(resolved.source().startsWith("project override"), "project override should win over global");
+    }
+
+    @Test
+    void stepDefaultIsUsedWhenNoOverrideExists() {
+        ReleaseState state =
+                ReleaseState.create("my-plugin", "org.apache.maven", "2.0", ComponentType.PLUGIN, Path.of("/tmp"));
+
+        CommandResolver resolver = new CommandResolver(null, null);
+        CommandResolver.ResolvedCommands resolved =
+                resolver.resolve(new MavenPrepareAndPerformStep(new CommandRunner()), state);
+
+        assertTrue(
+                resolved.commands().stream().anyMatch(c -> c.contains("release:prepare")),
+                "default should include release:prepare");
+        assertTrue(
+                resolved.commands().stream().anyMatch(c -> c.contains("release:perform")),
+                "default should include release:perform");
+        assertTrue(resolved.source().startsWith("default"), "source should indicate default");
     }
 }

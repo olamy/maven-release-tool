@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.maven.release.tool.config.CommandOverrideStore;
 import org.apache.maven.release.tool.config.CommandResolver;
+import org.apache.maven.release.tool.config.GlobalConfig;
 import org.apache.maven.release.tool.config.ProjectConfig;
 import org.apache.maven.release.tool.eta.EtaHistory;
 import org.apache.maven.release.tool.eta.EtaTracker;
@@ -139,11 +140,13 @@ public class MavenReleaseTool {
 
                 CommandOverrideStore overrideStore = new CommandOverrideStore(stateStore.getBaseDir());
                 ProjectConfig projectConfig = overrideStore.load(gitUrl);
+                GlobalConfig globalConfig = overrideStore.loadGlobal();
 
                 PipelineBuilder pipelineBuilder = new PipelineBuilder(runner, stateStore);
                 List<Step> steps = pipelineBuilder.buildPipeline(type);
 
-                ReleasePipeline pipeline = new ReleasePipeline(steps, state, stateStore, overrideStore, projectConfig);
+                ReleasePipeline pipeline =
+                        new ReleasePipeline(steps, state, stateStore, overrideStore, projectConfig, globalConfig);
 
                 EtaHistory etaHistory = new EtaHistory(stateStore.getBaseDir());
                 etaHistory.load();
@@ -164,7 +167,7 @@ public class MavenReleaseTool {
                 System.out.println("Steps: " + steps.size());
                 System.out.println();
 
-                runPipeline(pipeline, etaTracker, etaHistory, overrideStore, projectConfig, capture);
+                runPipeline(pipeline, etaTracker, etaHistory, overrideStore, projectConfig, globalConfig, capture);
 
             } catch (IOException e) {
                 System.err.println("Error: " + e.getMessage());
@@ -362,11 +365,13 @@ public class MavenReleaseTool {
         CommandRunner runner = new CommandRunner(capture);
         CommandOverrideStore overrideStore = new CommandOverrideStore(stateStore.getBaseDir());
         ProjectConfig projectConfig = overrideStore.load(state.getGitRemoteUrl());
+        GlobalConfig globalConfig = overrideStore.loadGlobal();
 
         PipelineBuilder pipelineBuilder = new PipelineBuilder(runner, stateStore);
         List<Step> steps = pipelineBuilder.buildPipeline(state.getComponentType());
 
-        ReleasePipeline pipeline = new ReleasePipeline(steps, state, stateStore, overrideStore, projectConfig);
+        ReleasePipeline pipeline =
+                new ReleasePipeline(steps, state, stateStore, overrideStore, projectConfig, globalConfig);
 
         EtaHistory etaHistory = new EtaHistory(stateStore.getBaseDir());
         etaHistory.load();
@@ -385,7 +390,7 @@ public class MavenReleaseTool {
             stateStore.save(state);
         }
 
-        runPipeline(pipeline, etaTracker, etaHistory, overrideStore, projectConfig, capture);
+        runPipeline(pipeline, etaTracker, etaHistory, overrideStore, projectConfig, globalConfig, capture);
     }
 
     private static void runPipeline(
@@ -394,6 +399,7 @@ public class MavenReleaseTool {
             EtaHistory etaHistory,
             CommandOverrideStore overrideStore,
             ProjectConfig projectConfig,
+            GlobalConfig globalConfig,
             TeeOutputCapture capture)
             throws IOException {
 
@@ -454,7 +460,8 @@ public class MavenReleaseTool {
                     continue;
                 }
                 case EDITED -> {
-                    confirmView.promptSaveOverride(commandsToRun, step.name(), overrideStore, projectConfig);
+                    confirmView.promptSaveOverride(
+                            commandsToRun, step.name(), overrideStore, projectConfig, globalConfig);
                 }
                 case ACCEPT -> {
                     // fall through to execute

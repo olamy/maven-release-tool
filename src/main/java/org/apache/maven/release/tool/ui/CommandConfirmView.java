@@ -35,6 +35,7 @@ import dev.tamboui.widgets.paragraph.Paragraph;
 import org.apache.maven.release.tool.config.CommandOverride;
 import org.apache.maven.release.tool.config.CommandOverrideStore;
 import org.apache.maven.release.tool.config.CommandResolver;
+import org.apache.maven.release.tool.config.GlobalConfig;
 import org.apache.maven.release.tool.config.ProjectConfig;
 
 public class CommandConfirmView {
@@ -143,6 +144,53 @@ public class CommandConfirmView {
         }
     }
 
+    public boolean promptSaveOverride(
+            List<String> editedCommands,
+            String stepName,
+            CommandOverrideStore overrideStore,
+            ProjectConfig projectConfig,
+            GlobalConfig globalConfig)
+            throws IOException {
+
+        System.out.println();
+        printStyled(
+                "Save this override? [p] Project only  [g] Global (all projects)  [n] Don't save: ",
+                Style.EMPTY.fg(Color.YELLOW));
+        String input = stdinReader.readLine();
+
+        if (input == null) {
+            return false;
+        }
+        input = input.trim().toLowerCase();
+
+        if (input.equals("p")) {
+            System.out.print("Reason (optional): ");
+            String reason = stdinReader.readLine();
+            if (reason != null && reason.isBlank()) {
+                reason = null;
+            }
+            projectConfig.setOverride(stepName, new CommandOverride(editedCommands, reason));
+            overrideStore.save(projectConfig);
+            System.out.println("Override saved for this project.");
+            return true;
+        } else if (input.equals("g")) {
+            System.out.print("Reason (optional): ");
+            String reason = stdinReader.readLine();
+            if (reason != null && reason.isBlank()) {
+                reason = null;
+            }
+            globalConfig.setOverride(stepName, new CommandOverride(editedCommands, reason));
+            overrideStore.saveGlobal(globalConfig);
+            System.out.println("Override saved globally.");
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @deprecated Use {@link #promptSaveOverride(List, String, CommandOverrideStore, ProjectConfig, GlobalConfig)} instead.
+     */
+    @Deprecated
     public boolean promptSaveOverride(
             List<String> editedCommands,
             String stepName,
