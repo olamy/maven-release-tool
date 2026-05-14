@@ -61,14 +61,14 @@ public class SendAnnouncementStep extends AbstractStep {
             return StepResult.failure("Failed to save announcement email: " + e.getMessage());
         }
 
-        return StepResult.ok("Announcement email saved to release directory (announcement-email.txt).\n"
+        return StepResult.okFullScreen("Announcement email saved to release directory (announcement-email.txt).\n"
                 + "Send from your @apache.org email address.\n\n"
                 + email);
     }
 
     @Override
     public StepResult dryRun(ReleaseState state, List<String> commands) {
-        return StepResult.ok("DRY-RUN: Would generate announcement email:\n\n" + generateAnnouncement(state));
+        return StepResult.okFullScreen("DRY-RUN: Would generate announcement email:\n\n" + generateAnnouncement(state));
     }
 
     private String generateAnnouncement(ReleaseState state) {

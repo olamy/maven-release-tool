@@ -60,14 +60,14 @@ public class RecordVoteResultStep extends AbstractStep {
             return StepResult.failure("Failed to save vote result email: " + e.getMessage());
         }
 
-        return StepResult.ok("Vote result email saved to release directory (vote-result-email.txt).\n"
+        return StepResult.okFullScreen("Vote result email saved to release directory (vote-result-email.txt).\n"
                 + "Review and send to dev@maven.apache.org (cc: private@maven.apache.org).\n\n"
                 + email);
     }
 
     @Override
     public StepResult dryRun(ReleaseState state, List<String> commands) {
-        return StepResult.ok("DRY-RUN: Would generate vote result email:\n\n" + generateResultEmail(state));
+        return StepResult.okFullScreen("DRY-RUN: Would generate vote result email:\n\n" + generateResultEmail(state));
     }
 
     private String generateResultEmail(ReleaseState state) {

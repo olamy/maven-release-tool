@@ -541,8 +541,12 @@ public class MavenReleaseTool {
                 if (stepState.getDurationSeconds() != null) {
                     etaTracker.recordCompletedStep(pipeline.getState(), stepState);
                 }
-                dashboard.clearAndRender();
-                outputView.show(dashboard, capture.getLines(), step.name());
+                if (result.fullScreen()) {
+                    outputView.showFullScreen(dashboard, capture.getLines(), step.name());
+                } else {
+                    dashboard.clearAndRender();
+                    outputView.show(dashboard, capture.getLines(), step.name());
+                }
             } else {
                 dashboard.clearAndRender();
                 outputView.show(dashboard, capture.getLines(), step.name());

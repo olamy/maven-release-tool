@@ -18,6 +18,7 @@
  */
 package org.apache.maven.release.tool.steps;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.apache.maven.release.tool.model.ComponentType;
@@ -32,9 +33,9 @@ public interface Step {
 
     List<String> defaultCommands(ReleaseState state);
 
-    StepResult execute(ReleaseState state, List<String> commands);
+    StepResult execute(ReleaseState state, List<String> commands) throws IOException;
 
-    StepResult dryRun(ReleaseState state, List<String> commands);
+    StepResult dryRun(ReleaseState state, List<String> commands) throws IOException;
 
     boolean isApplicable(ComponentType type);
 }

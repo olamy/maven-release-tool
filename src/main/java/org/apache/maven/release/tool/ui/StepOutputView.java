@@ -52,6 +52,49 @@ public class StepOutputView {
     private static final int WIDTH = 80;
 
     /**
+     * Shows the content full-screen (all lines, no truncation), blocking until the
+     * user presses any key. After the keypress the screen is cleared and the dashboard
+     * is re-rendered so the user can see the step list again.
+     * If {@code lines} is empty, returns immediately without blocking.
+     */
+    public void showFullScreen(ReleaseDashboard dashboard, List<String> lines, String stepName) throws IOException {
+        if (lines.isEmpty()) {
+            return;
+        }
+
+        printFullScreen(lines, stepName);
+
+        try (Terminal terminal =
+                TerminalBuilder.builder().system(true).jansi(true).build()) {
+            terminal.enterRawMode();
+            terminal.reader().read();
+        }
+
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+        dashboard.render();
+    }
+
+    private void printFullScreen(List<String> lines, String stepName) {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+        System.out.println();
+        printSectionHeader(stepName, true, lines.size());
+        System.out.println();
+        for (String line : lines) {
+            System.out.println("  " + line);
+        }
+        System.out.println();
+
+        Buffer buf = Buffer.empty(Rect.of(WIDTH, 1));
+        Paragraph.builder()
+                .text(Text.styled("  any key to continue", Style.EMPTY.fg(Color.DARK_GRAY)))
+                .build()
+                .render(buf.area(), buf);
+        System.out.println(buf.toAnsiStringTrimmed());
+    }
+
+    /**
      * Shows the step output below the already-rendered dashboard.
      * Blocks until the user presses a key; Ctrl+E/Ctrl+R toggle between
      * collapsed and expanded views (each toggle re-renders the full screen).

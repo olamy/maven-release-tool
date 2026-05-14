@@ -18,7 +18,7 @@
  */
 package org.apache.maven.release.tool.model;
 
-public record StepResult(boolean succeeded, String message, Action suggestedAction) {
+public record StepResult(boolean succeeded, String message, Action suggestedAction, boolean fullScreen) {
 
     public enum Action {
         CONTINUE,
@@ -28,22 +28,30 @@ public record StepResult(boolean succeeded, String message, Action suggestedActi
     }
 
     public static StepResult ok() {
-        return new StepResult(true, null, Action.CONTINUE);
+        return new StepResult(true, null, Action.CONTINUE, false);
     }
 
     public static StepResult ok(String message) {
-        return new StepResult(true, message, Action.CONTINUE);
+        return new StepResult(true, message, Action.CONTINUE, false);
+    }
+
+    /**
+     * Like {@link #ok(String)} but signals the UI to display the message full-screen
+     * before re-rendering the step dashboard.
+     */
+    public static StepResult okFullScreen(String message) {
+        return new StepResult(true, message, Action.CONTINUE, true);
     }
 
     public static StepResult failure(String message) {
-        return new StepResult(false, message, Action.RETRY);
+        return new StepResult(false, message, Action.RETRY, false);
     }
 
     public static StepResult abort(String message) {
-        return new StepResult(false, message, Action.ABORT);
+        return new StepResult(false, message, Action.ABORT, false);
     }
 
     public static StepResult pause(String message) {
-        return new StepResult(true, message, Action.PAUSE);
+        return new StepResult(true, message, Action.PAUSE, false);
     }
 }

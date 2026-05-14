@@ -18,6 +18,7 @@
  */
 package org.apache.maven.release.tool.steps;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -40,7 +41,7 @@ public abstract class AbstractStep implements Step {
     }
 
     @Override
-    public StepResult dryRun(ReleaseState state, List<String> commands) {
+    public StepResult dryRun(ReleaseState state, List<String> commands) throws IOException {
         StringBuilder sb = new StringBuilder();
         sb.append("DRY-RUN: ").append(describe()).append("\n");
         sb.append("Would execute:\n");
