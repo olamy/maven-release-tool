@@ -138,7 +138,7 @@ The tool guides you through these steps (filtered by component type):
 | 4 | `release:perform` | Checkout tag, deploy to staging |
 | 5 | Close staging repo | Nexus REST API (requires `NEXUS_USERNAME`/`NEXUS_PASSWORD` env vars) |
 | 6 | Stage documentation | `mvn site + scm-publish:publish-scm` |
-| 7 | Call vote | Generates vote email, saves to `vote-email.txt` |
+| 7 | Call vote | Fetches closed-issue count from GitHub, prompts for previous version / staging repo ID / SHA512, generates `vote-email.txt` |
 | 8 | Wait for vote | **Pauses here.** State saved. Resume after 72h+ vote. |
 | 9 | Record vote result | Generates result email, saves to `vote-result-email.txt` |
 | 10 | Copy to dist | SVN copy source release to `dist.apache.org` |
@@ -246,6 +246,26 @@ Steps that interact with the Nexus staging API (close, promote, drop) require:
 export NEXUS_USERNAME=your-apache-id
 export NEXUS_PASSWORD=your-nexus-password
 ```
+
+## GitHub API Access
+
+The **Call vote** step fetches the number of closed issues and pull requests from the
+GitHub milestone that matches the release version, so the vote email contains the real
+count instead of a placeholder.
+
+The GitHub Search API is used unauthenticated by default (60 requests/hour per IP).
+If you run into rate-limit errors, or simply want higher limits, export a personal
+access token before starting the release:
+
+```bash
+export GITHUB_TOKEN=ghp_yourTokenHere
+```
+
+A classic token with no scopes (read-only, public repositories) is sufficient.
+You can create one at <https://github.com/settings/tokens>.
+
+If the API call fails for any reason (network, rate limit, milestone not found), the
+tool falls back gracefully and leaves `N` as a placeholder in the email.
 
 ## Component Types
 
