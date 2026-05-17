@@ -27,7 +27,7 @@ Built with [Tamboui](https://github.com/tamboui/tamboui) for terminal UI and [Pi
 
 ## Features
 
-- **18-step release pipeline** covering the entire process from pre-release checks to dist-tool verification
+- **16-step release pipeline** covering the entire process from pre-release checks to dist-tool verification
 - **Interactive command confirmation** — review, edit, skip, or dry-run every command before it runs
 - **Per-project command overrides** — customize commands per project (e.g., Surefire needs `-pl !surefire-its` for site builds), saved for future releases
 - **State persistence** — release state saved to disk, survives the 72h+ vote period, resume anytime
@@ -134,22 +134,20 @@ The tool guides you through these steps (filtered by component type):
 |---|------|-------------|
 | 1 | Pre-release checks | GPG key, JDK, git clean, SNAPSHOT dependencies |
 | 2 | Verify site | `mvn -Preporting site site:stage` |
-| 3 | `release:prepare` | Version bumps, SCM tag, clean verify |
-| 4 | `release:perform` | Checkout tag, deploy to staging |
-| 5 | Close staging repo | Nexus REST API (requires `NEXUS_USERNAME`/`NEXUS_PASSWORD` env vars) |
-| 6 | Stage documentation | `mvn site + scm-publish:publish-scm` |
-| 7 | Call vote | Fetches closed-issue count from GitHub, prompts for previous version / staging repo ID / SHA512, generates `vote-email.txt` |
-| 8 | Wait for vote | **Pauses here.** State saved. Resume after 72h+ vote. |
-| 9 | Record vote result | Generates result email, saves to `vote-result-email.txt` |
-| 10 | Copy to dist | SVN copy source release to `dist.apache.org` |
-| 11 | Report release | Prompt to submit at `reporter.apache.org` |
-| 12 | Promote artifacts | Nexus REST API: release staging repo to Maven Central |
-| 13 | Publish documentation | `svn cp/rm` versioned docs |
-| 14 | Update website | `mvn -Pupdate package` (plugins/shared) or manual (core) |
-| 15 | Deploy site | `deploySite.sh` or `mvn site-deploy` |
-| 16 | Wait for sync | Maven Central ~4h, website ~1h |
-| 17 | Send announcement | Generates announcement email with correct recipients |
-| 18 | Verify dist-tool | Check dist-tool report for errors |
+| 3 | `release:prepare` + `release:perform` | Version bumps, SCM tag, clean verify, then deploy to staging — reviewed and run as one unit |
+| 4 | Close staging repo | Nexus REST API (requires `NEXUS_USERNAME`/`NEXUS_PASSWORD` env vars) |
+| 5 | Stage documentation | `mvn site + scm-publish:publish-scm` |
+| 6 | Call vote | Prompts interactively for previous version, staging repo ID, and SHA512; fetches closed-issue count from GitHub; generates `vote-email.txt` and displays it full-screen |
+| 7 | Wait for vote | **Pauses here.** State saved. Resume after 72h+ vote. |
+| 8 | Record vote result | Generates result email, saves to `vote-result-email.txt` |
+| 9 | Copy to dist | SVN copy source release to `dist.apache.org` |
+| 10 | Report release | Prompt to submit at `reporter.apache.org` |
+| 11 | Promote artifacts | Nexus REST API: release staging repo to Maven Central |
+| 12 | Publish documentation | `svn cp/rm` versioned docs |
+| 13 | Update website | `mvn -Pupdate package` (plugins/shared) or manual (core) |
+| 14 | Wait for sync | Maven Central ~4h, website ~1h |
+| 15 | Send announcement | Generates announcement email with correct recipients |
+| 16 | Verify dist-tool | Check dist-tool report for errors |
 
 ## Interactive Controls
 
@@ -182,7 +180,7 @@ On failure of `release:prepare` or `release:perform`:
 Once a step completes (success or failure), the dashboard is refreshed and the last 10 lines of that step's output appear below it:
 
 ```
-▸ maven-release-prepare  [last 10 of 247 lines]
+▸ maven-release-prepare-and-perform  [last 10 of 247 lines]
   [INFO] Tagging release with the label maven-compiler-plugin-3.14.0...
   [INFO] Executing: /bin/sh -c cd ...
   ...
@@ -195,7 +193,9 @@ Once a step completes (success or failure), the dashboard is refreshed and the l
 - **Ctrl+R** — collapse back to the last 10 lines
 - **any other key** — dismiss and confirm the next step
 
-## Per-Project Command Overrides
+Some steps (e.g. **Call vote**) display their result full-screen instead of the 10-line summary. Press any key to return to the dashboard.
+
+## Command Overrides
 
 Each project can have custom commands saved in `~/.m2/maven-release-tool/projects/<name>/commands.json`.
 Projects are identified by their git remote URL.
@@ -203,15 +203,15 @@ Projects are identified by their git remote URL.
 When you edit a command during a release, you're prompted to save it:
 
 ```
-Save this override for future releases of this project? [y/N]
+Save this override? [p] Project only  [g] Global (all projects)  [n] Don't save:
 Reason (optional): Exclude ITs module from site generation
 ```
 
 Overrides are resolved via a 3-level hierarchy (most specific wins):
 
 1. Per-project saved overrides
-2. Per-component-type defaults (built into the tool)
-3. Global defaults (built into the tool)
+2. Global saved overrides (applies to all projects)
+3. Step defaults (built into the tool)
 
 Commands support variable interpolation: `${version}`, `${tag}`, `${nextVersion}`, `${artifactId}`, `${groupId}`, `${stagingRepoId}`, `${stagingRepoUrl}`.
 
@@ -232,6 +232,7 @@ All data is stored under `~/.m2/maven-release-tool/`:
 │       ├── announcement-email.txt       Generated announcement
 │       ├── commands.log                 All executed commands
 │       └── output/                      Build output per step
+├── global-commands.json                 Global command overrides (all projects)
 ├── history.json                         ETA timing data
 └── config.json                          User preferences
 ```
