@@ -18,9 +18,7 @@
  */
 package org.apache.maven.release.tool;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -46,6 +44,11 @@ import org.apache.maven.release.tool.ui.CommandConfirmView;
 import org.apache.maven.release.tool.ui.ReleaseDashboard;
 import org.apache.maven.release.tool.ui.ReleaseSelector;
 import org.apache.maven.release.tool.ui.StepOutputView;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.impl.completer.FileNameCompleter;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -181,14 +184,19 @@ public class MavenReleaseTool {
 
         private Path promptProjectDir() throws IOException {
             Path defaultDir = Path.of("").toAbsolutePath();
-            System.out.print("Project directory [" + defaultDir + "]: ");
-            System.out.flush();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-            String input = reader.readLine();
-            if (input == null || input.isBlank()) {
-                return defaultDir;
+            try (Terminal terminal =
+                    TerminalBuilder.builder().system(true).jansi(true).build()) {
+                LineReader reader = LineReaderBuilder.builder()
+                        .terminal(terminal)
+                        .completer(new FileNameCompleter())
+                        .build();
+                String input = reader.readLine("Project directory [" + defaultDir + "]: ");
+                if (input == null || input.isBlank()) {
+                    return defaultDir;
+                }
+                Path typed = Path.of(input.trim());
+                return typed.isAbsolute() ? typed : defaultDir.resolve(typed).normalize();
             }
-            return Path.of(input.trim());
         }
 
         private String detectArtifactId(CommandRunner runner, Path dir) {
