@@ -18,7 +18,9 @@
  */
 package org.apache.maven.release.tool;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -98,8 +100,7 @@ public class MavenReleaseTool {
 
         @Option(
                 names = "--project-dir",
-                description = "Project directory (defaults to current dir)",
-                defaultValue = ".")
+                description = "Project directory (prompts with current dir as default when omitted)")
         Path projectDir;
 
         @Option(
@@ -113,6 +114,9 @@ public class MavenReleaseTool {
         @Override
         public void run() {
             try {
+                if (projectDir == null) {
+                    projectDir = promptProjectDir();
+                }
                 StateStore stateStore = new StateStore();
                 TeeOutputCapture capture = new TeeOutputCapture();
                 CommandRunner runner = new CommandRunner(capture);
@@ -173,6 +177,18 @@ public class MavenReleaseTool {
             } catch (IOException e) {
                 System.err.println("Error: " + e.getMessage());
             }
+        }
+
+        private Path promptProjectDir() throws IOException {
+            Path defaultDir = Path.of("").toAbsolutePath();
+            System.out.print("Project directory [" + defaultDir + "]: ");
+            System.out.flush();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+            String input = reader.readLine();
+            if (input == null || input.isBlank()) {
+                return defaultDir;
+            }
+            return Path.of(input.trim());
         }
 
         private String detectArtifactId(CommandRunner runner, Path dir) {

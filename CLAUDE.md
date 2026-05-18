@@ -27,7 +27,7 @@ This file provides guidance to Claude Code when working with this repository.
 # Compile
 mvn compile
 
-# Run tests (36 tests across 7 test classes)
+# Run tests (56 tests across 10 test classes)
 mvn test
 
 # Full build (compile + checkstyle + enforcer + test + fat JAR)
@@ -86,13 +86,13 @@ org.apache.maven.release.tool
 ├── steps/                         One class per release step, all implement Step interface
 │   ├── Step.java                  Interface: name(), describe(), defaultCommands(), execute(), dryRun(), isApplicable()
 │   ├── AbstractStep.java          Base class with CommandRunner and runCommands() helper
-│   └── ...                        18 concrete steps (PreReleaseChecks through VerifyDistTool)
+│   └── ...                        16 concrete steps (PreReleaseChecks through VerifyDistTool)
 ├── pipeline/                      PipelineBuilder (assembles steps by ComponentType) + ReleasePipeline (drives execution)
-├── config/                        Per-project command overrides (CommandOverrideStore, CommandResolver, ProjectConfig)
+├── config/                        Per-project command overrides (CommandOverride, CommandOverrideStore, CommandResolver, ProjectConfig, GlobalConfig)
 ├── persistence/                   StateStore — JSON serialization to ~/.m2/maven-release-tool/releases/<id>/
 ├── eta/                           EtaTracker + EtaHistory — median step durations from past releases
 ├── exec/                          CommandRunner + TeeOutputCapture — ProcessBuilder-based execution (no shell involved)
-├── integration/                   NexusClient (Jetty HTTP Client) for Nexus staging API
+├── integration/                   NexusClient (Jetty HTTP Client) for Nexus staging API; GitHubClient for GitHub API
 └── ui/                            ReleaseDashboard, StepOutputView, CommandConfirmView (interactive prompts)
 ```
 
@@ -123,6 +123,8 @@ org.apache.maven.release.tool
   - **any other key** — dismiss and continue to the next step
 - `--version` and `--next-version` are both optional on `start`. Version is auto-detected
   from pom.xml (strips `-SNAPSHOT`). The release plugin prompts for anything not provided.
+- `--project-dir` is optional on `start`. When omitted, the tool prompts the user with the
+  current working directory as the default (press Enter to accept, or type a custom path).
 
 ### Adding a New Step
 

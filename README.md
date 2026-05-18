@@ -99,7 +99,7 @@ maven-release-tool start \
 maven-release-tool start --dry-run
 ```
 
-All options are optional — `--version` and `--next-version` are auto-detected from pom.xml or prompted by the release plugin if omitted.
+All options are optional — `--version` and `--next-version` are auto-detected from pom.xml or prompted by the release plugin if omitted. When `--project-dir` is not supplied, the tool interactively prompts with the current directory as the default (press Enter to accept, or type a different path).
 
 ### Resume after vote or interruption
 
