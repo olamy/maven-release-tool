@@ -126,20 +126,33 @@ public class MavenReleaseTool {
                 Path absProjectDir = projectDir.toAbsolutePath();
 
                 if (component == null) {
+                    System.out.print("  Detecting artifact ID... ");
+                    System.out.flush();
                     component = detectArtifactId(runner, absProjectDir);
+                    System.out.println(component);
                 }
                 if (type == null) {
+                    System.out.print("  Detecting component type... ");
+                    System.out.flush();
                     type = detectComponentType(runner, absProjectDir);
+                    System.out.println(type);
                 }
 
                 if (version == null) {
+                    System.out.print("  Detecting version... ");
+                    System.out.flush();
                     version = detectVersion(runner, absProjectDir);
+                    System.out.println(version != null ? version : "(not detected, release plugin will prompt)");
                 }
+
+                System.out.print("  Detecting group ID... ");
+                System.out.flush();
+                String groupId = detectGroupId(runner, absProjectDir);
+                System.out.println(groupId != null ? groupId : "(not detected)");
 
                 String releaseTag = version != null ? component + "-" + version : null;
 
-                ReleaseState state = ReleaseState.create(
-                        component, detectGroupId(runner, absProjectDir), version, type, absProjectDir);
+                ReleaseState state = ReleaseState.create(component, groupId, version, type, absProjectDir);
                 state.setReleaseTag(releaseTag);
                 state.setNextVersion(nextVersion);
                 state.setDryRun(dryRun);
