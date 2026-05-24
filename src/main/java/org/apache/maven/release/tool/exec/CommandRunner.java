@@ -24,15 +24,22 @@ import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.apache.maven.release.tool.model.StepResult;
 
 public class CommandRunner {
 
     private final Consumer<String> outputHandler;
+    private final Supplier<String> inputSupplier;
+
+    public CommandRunner(Consumer<String> outputHandler, Supplier<String> inputSupplier) {
+        this.outputHandler = outputHandler;
+        this.inputSupplier = inputSupplier;
+    }
 
     public CommandRunner(Consumer<String> outputHandler) {
-        this.outputHandler = outputHandler;
+        this(outputHandler, CommandRunner::readStdin);
     }
 
     public CommandRunner() {
@@ -105,6 +112,25 @@ public class CommandRunner {
                 Thread.currentThread().interrupt();
             }
             return "";
+        }
+    }
+
+    /**
+     * Prompt the user with a yes/no question and return {@code true} if they answer "y" or "yes".
+     * The prompt is printed via the output handler; input is read from the configured input supplier.
+     */
+    public boolean promptYesNo(String prompt) {
+        outputHandler.accept(prompt + " [y/N] ");
+        String answer = inputSupplier.get();
+        return answer != null
+                && (answer.trim().equalsIgnoreCase("y") || answer.trim().equalsIgnoreCase("yes"));
+    }
+
+    private static String readStdin() {
+        try {
+            return new BufferedReader(new InputStreamReader(System.in)).readLine();
+        } catch (IOException e) {
+            return null;
         }
     }
 }

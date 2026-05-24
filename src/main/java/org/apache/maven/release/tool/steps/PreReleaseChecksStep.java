@@ -52,7 +52,11 @@ public class PreReleaseChecksStep extends AbstractStep {
 
     @Override
     public List<String> defaultCommands(ReleaseState state) {
-        return List.of("gpg --list-secret-keys", "java -version", "git status --porcelain");
+        return List.of(
+                "gpg --list-secret-keys",
+                "java -version",
+                "git status --porcelain",
+                "mvn dependency:list --no-transfer-progress");
     }
 
     @Override
@@ -73,21 +77,45 @@ public class PreReleaseChecksStep extends AbstractStep {
         }
         logSuccess("Working directory clean");
 
-        // Check no SNAPSHOT dependencies (quick grep in pom.xml)
-        String snapshots = runner.getOutput(projectDir(state), List.of("grep", "-r", "SNAPSHOT", "pom.xml"));
-        // Filter out the project's own version (which is expected to be SNAPSHOT)
-        long externalSnapshots = snapshots
-                .lines()
+        // Check for SNAPSHOT dependencies via Maven dependency resolution.
+        // This catches deps inherited from parent POMs, BOMs, and property-resolved versions
+        // that a plain pom.xml grep would miss.
+        String depList =
+                runner.getOutput(projectDir(state), List.of("mvn", "dependency:list", "--no-transfer-progress"));
+        // Coordinates may be 5-part (groupId:artifactId:type:version:scope)
+        // or 6-part with classifier (groupId:artifactId:type:classifier:version:scope).
+        // The regex matches both by allowing the SNAPSHOT token to appear anywhere after the type.
+        List<String> snapshotLines = depList.lines()
                 .filter(line -> line.contains("SNAPSHOT"))
-                .filter(line -> !line.contains("<version>" + state.getVersion().replace("-SNAPSHOT", "") + "-SNAPSHOT"))
-                .filter(line -> !line.contains("<tag>"))
-                .count();
+                .filter(line -> line.matches("^\\[INFO]\\s{4}\\S+:\\S+:\\S+:.*SNAPSHOT.*"))
+                .toList();
 
-        if (externalSnapshots > 0) {
-            logFailure("Found external SNAPSHOT dependencies");
-            return StepResult.failure("Found SNAPSHOT dependencies in pom.xml. Resolve them before releasing.");
+        if (!snapshotLines.isEmpty()) {
+            String projectGroupId = state.getGroupId();
+            String artifactList = snapshotLines.stream()
+                    .map(line -> {
+                        String[] parts = line.replaceFirst("^\\[INFO]\\s+", "").split(":");
+                        // Find the version token (the one containing SNAPSHOT)
+                        String version = java.util.Arrays.stream(parts)
+                                .filter(p -> p.contains("SNAPSHOT"))
+                                .findFirst()
+                                .orElse("?-SNAPSHOT");
+                        String label =
+                                projectGroupId != null && parts[0].equals(projectGroupId) ? " (inter-module)" : "";
+                        return parts[0] + ":" + parts[1] + ":" + version + label;
+                    })
+                    .distinct()
+                    .reduce("", (a, b) -> a + "\n  - " + b);
+            runner.log("  \u26a0 SNAPSHOT dependencies found:" + artifactList);
+            boolean accepted = runner.promptYesNo("  Continue with the release anyway?");
+            if (!accepted) {
+                logFailure("Release blocked by SNAPSHOT dependencies");
+                return StepResult.failure("Release blocked: SNAPSHOT dependencies not accepted:" + artifactList);
+            }
+            logSuccess("SNAPSHOT dependencies accepted by user");
+        } else {
+            logSuccess("No SNAPSHOT dependencies");
         }
-        logSuccess("No external SNAPSHOT dependencies");
 
         // Detect and store the most recent git tag (previous release tag)
         String previousTag =

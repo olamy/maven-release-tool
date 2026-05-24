@@ -42,18 +42,26 @@ class PreReleaseChecksStepTest {
 
     private List<String> logOutput;
     private Map<String, String> commandOutputs;
+    private boolean promptYesNoResponse;
     private PreReleaseChecksStep step;
 
     @BeforeEach
     void setUp() {
         logOutput = new ArrayList<>();
         commandOutputs = new HashMap<>();
+        promptYesNoResponse = false;
 
         CommandRunner runner = new CommandRunner(logOutput::add) {
             @Override
             public String getOutput(Path workingDir, List<String> args) {
                 String key = String.join(" ", args);
                 return commandOutputs.getOrDefault(key, "");
+            }
+
+            @Override
+            public boolean promptYesNo(String prompt) {
+                logOutput.add(prompt);
+                return promptYesNoResponse;
             }
         };
 
@@ -65,17 +73,24 @@ class PreReleaseChecksStepTest {
                 "maven-test-plugin", "org.apache.maven.plugins", "1.0.0-SNAPSHOT", ComponentType.PLUGIN, tempDir);
     }
 
+    private ReleaseState stateWithNullGroupId() {
+        return ReleaseState.create("maven-test-plugin", null, "1.0.0-SNAPSHOT", ComponentType.PLUGIN, tempDir);
+    }
+
     @Test
     void allChecksPassed() {
         commandOutputs.put("gpg --list-secret-keys", "sec rsa4096 2024-01-01");
         commandOutputs.put("git status --porcelain", "");
-        commandOutputs.put("grep -r SNAPSHOT pom.xml", "<version>1.0.0-SNAPSHOT</version>");
+        // No SNAPSHOT deps at all — clean project
+        commandOutputs.put(
+                "mvn dependency:list --no-transfer-progress",
+                "[INFO]    org.apache.commons:commons-lang3:jar:3.12.0:compile\n");
 
         StepResult result = step.execute(newState(), List.of());
 
         assertTrue(result.succeeded());
-        assertTrue(logContains("✓"), "Expected success tick in output");
-        long successCount = logOutput.stream().filter(l -> l.contains("✓")).count();
+        assertTrue(logContains("\u2713"), "Expected success tick in output");
+        long successCount = logOutput.stream().filter(l -> l.contains("\u2713")).count();
         assertTrue(successCount == 3, "Expected 3 success ticks but got " + successCount);
     }
 
@@ -86,9 +101,9 @@ class PreReleaseChecksStepTest {
         StepResult result = step.execute(newState(), List.of());
 
         assertFalse(result.succeeded());
-        assertTrue(logContains("✗"), "Expected failure cross in output");
+        assertTrue(logContains("\u2717"), "Expected failure cross in output");
         assertTrue(logContains("GPG"), "Expected GPG mentioned in failure");
-        assertFalse(logContains("✓"), "No success ticks should appear before GPG failure");
+        assertFalse(logContains("\u2713"), "No success ticks should appear before GPG failure");
     }
 
     @Test
@@ -99,25 +114,91 @@ class PreReleaseChecksStepTest {
         StepResult result = step.execute(newState(), List.of());
 
         assertFalse(result.succeeded());
-        assertTrue(logContains("✓"), "GPG check should have passed");
-        assertTrue(logContains("✗"), "Git check should show failure");
-        long successCount = logOutput.stream().filter(l -> l.contains("✓")).count();
+        assertTrue(logContains("\u2713"), "GPG check should have passed");
+        assertTrue(logContains("\u2717"), "Git check should show failure");
+        long successCount = logOutput.stream().filter(l -> l.contains("\u2713")).count();
         assertTrue(successCount == 1, "Only GPG tick should appear, got " + successCount);
     }
 
     @Test
-    void externalSnapshotDependency() {
+    void snapshotDependencyUserAccepts() {
         commandOutputs.put("gpg --list-secret-keys", "sec rsa4096 2024-01-01");
         commandOutputs.put("git status --porcelain", "");
+        // Any SNAPSHOT dep — user is prompted and accepts
         commandOutputs.put(
-                "grep -r SNAPSHOT pom.xml", "<version>1.0.0-SNAPSHOT</version>\n<version>2.0.0-SNAPSHOT</version>");
+                "mvn dependency:list --no-transfer-progress",
+                "[INFO]    com.example:snapshot-lib:jar:2.0-SNAPSHOT:compile\n");
+        promptYesNoResponse = true;
 
         StepResult result = step.execute(newState(), List.of());
 
-        assertFalse(result.succeeded());
-        long successCount = logOutput.stream().filter(l -> l.contains("✓")).count();
-        assertTrue(successCount == 2, "GPG and git ticks should appear, got " + successCount);
-        assertTrue(logContains("✗"), "SNAPSHOT check should show failure");
+        assertTrue(result.succeeded(), "Step should succeed when user accepts SNAPSHOT deps");
+        assertTrue(logContains("SNAPSHOT dependencies found"), "Should warn about SNAPSHOT deps");
+        assertTrue(logContains("snapshot-lib"), "Should name the artifact");
+        assertTrue(logContains("\u2713"), "Should show accepted tick");
+    }
+
+    @Test
+    void snapshotDependencyUserRejects() {
+        commandOutputs.put("gpg --list-secret-keys", "sec rsa4096 2024-01-01");
+        commandOutputs.put("git status --porcelain", "");
+        commandOutputs.put(
+                "mvn dependency:list --no-transfer-progress",
+                "[INFO]    com.example:snapshot-lib:jar:2.0-SNAPSHOT:compile\n");
+        promptYesNoResponse = false;
+
+        StepResult result = step.execute(newState(), List.of());
+
+        assertFalse(result.succeeded(), "Step should fail when user rejects SNAPSHOT deps");
+        assertTrue(logContains("\u2717"), "Should show failure tick");
+        assertTrue(result.message().contains("snapshot-lib"), "Failure message should name the artifact");
+    }
+
+    @Test
+    void internalSnapshotLabeledAsInterModule() {
+        commandOutputs.put("gpg --list-secret-keys", "sec rsa4096 2024-01-01");
+        commandOutputs.put("git status --porcelain", "");
+        // Same groupId — labelled (inter-module) in the output
+        commandOutputs.put(
+                "mvn dependency:list --no-transfer-progress",
+                "[INFO]    org.apache.maven.plugins:plugin-a:jar:1.0.0-SNAPSHOT:compile\n");
+        promptYesNoResponse = true;
+
+        StepResult result = step.execute(newState(), List.of());
+
+        assertTrue(result.succeeded());
+        assertTrue(logContains("inter-module"), "Same-groupId SNAPSHOT should be labelled as inter-module");
+    }
+
+    @Test
+    void classifierCoordinateHandledCorrectly() {
+        commandOutputs.put("gpg --list-secret-keys", "sec rsa4096 2024-01-01");
+        commandOutputs.put("git status --porcelain", "");
+        // 6-part coordinate with classifier: groupId:artifactId:type:classifier:version:scope
+        commandOutputs.put(
+                "mvn dependency:list --no-transfer-progress",
+                "[INFO]    org.apache.maven.plugins:maven-surefire-plugin:zip:site-source:3.5.6-SNAPSHOT:provided\n");
+        promptYesNoResponse = true;
+
+        StepResult result = step.execute(newState(), List.of());
+
+        assertTrue(result.succeeded(), "Classifier coordinate should be handled and prompted");
+        assertTrue(logContains("maven-surefire-plugin"), "Artifact name should appear in warning");
+        assertTrue(logContains("3.5.6-SNAPSHOT"), "SNAPSHOT version should appear in warning");
+    }
+
+    @Test
+    void nullGroupIdPromptsForAllSnapshots() {
+        commandOutputs.put("gpg --list-secret-keys", "sec rsa4096 2024-01-01");
+        commandOutputs.put("git status --porcelain", "");
+        commandOutputs.put(
+                "mvn dependency:list --no-transfer-progress",
+                "[INFO]    some.group:some-lib:jar:1.0-SNAPSHOT:compile\n");
+        promptYesNoResponse = true;
+
+        StepResult result = step.execute(stateWithNullGroupId(), List.of());
+
+        assertTrue(result.succeeded(), "Should succeed when user accepts and groupId is unknown");
     }
 
     private boolean logContains(String substring) {

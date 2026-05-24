@@ -138,7 +138,8 @@ public class MavenReleaseTool {
 
                 String releaseTag = version != null ? component + "-" + version : null;
 
-                ReleaseState state = ReleaseState.create(component, null, version, type, absProjectDir);
+                ReleaseState state = ReleaseState.create(
+                        component, detectGroupId(runner, absProjectDir), version, type, absProjectDir);
                 state.setReleaseTag(releaseTag);
                 state.setNextVersion(nextVersion);
                 state.setDryRun(dryRun);
@@ -210,6 +211,12 @@ public class MavenReleaseTool {
                     dir,
                     List.of("mvn", "help:evaluate", "-Dexpression=project.parent.artifactId", "-q", "-DforceStdout"));
             return ComponentType.fromParentArtifactId(parentArtifactId.trim());
+        }
+
+        private String detectGroupId(CommandRunner runner, Path dir) {
+            String output = runner.getOutput(
+                    dir, List.of("mvn", "help:evaluate", "-Dexpression=project.groupId", "-q", "-DforceStdout"));
+            return output.isBlank() ? null : output.trim();
         }
 
         private String detectVersion(CommandRunner runner, Path dir) {
