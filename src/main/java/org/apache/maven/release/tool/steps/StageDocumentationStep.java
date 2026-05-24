@@ -18,6 +18,7 @@
  */
 package org.apache.maven.release.tool.steps;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import org.apache.maven.release.tool.exec.CommandRunner;
@@ -52,5 +53,10 @@ public class StageDocumentationStep extends AbstractStep {
     @Override
     public StepResult execute(ReleaseState state, List<String> commands) {
         return runCommands(state, commands);
+    }
+
+    @Override
+    protected Path projectDir(ReleaseState state) {
+        return super.projectDir(state).resolve("target/checkout");
     }
 }
