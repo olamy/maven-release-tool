@@ -74,11 +74,72 @@ import picocli.CommandLine.Option;
             MavenReleaseTool.CleanCommand.class,
             MavenReleaseTool.StatsCommand.class
         })
-public class MavenReleaseTool {
+public class MavenReleaseTool implements Runnable {
+
+    @CommandLine.Spec
+    CommandLine.Model.CommandSpec spec;
 
     public static void main(String[] args) {
         int exitCode = new CommandLine(new MavenReleaseTool()).execute(args);
         System.exit(exitCode);
+    }
+
+    /**
+     * Invoked by picocli when no subcommand is given. Shows an interactive
+     * numbered menu of available subcommands and dispatches to the chosen one.
+     */
+    @Override
+    public void run() {
+        try {
+            String chosen = promptForSubcommand();
+            if (chosen == null) {
+                return;
+            }
+            spec.commandLine().execute(chosen);
+        } catch (IOException e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    private String promptForSubcommand() throws IOException {
+        List<CommandLine> subs = new java.util.ArrayList<>(spec.subcommands().values());
+        // Drop picocli's built-in HelpCommand if registered as a subcommand
+        subs.removeIf(c -> c.getCommandName().equals("help"));
+
+        System.out.println();
+        System.out.println("Available commands:");
+        for (int i = 0; i < subs.size(); i++) {
+            CommandLine sub = subs.get(i);
+            String desc = sub.getCommandSpec().usageMessage().description().length > 0
+                    ? sub.getCommandSpec().usageMessage().description()[0]
+                    : "";
+            System.out.printf("  %d) %-8s  %s%n", i + 1, sub.getCommandName(), desc);
+        }
+        System.out.println();
+
+        try (Terminal terminal =
+                TerminalBuilder.builder().system(true).jansi(true).build()) {
+            LineReader reader = LineReaderBuilder.builder().terminal(terminal).build();
+            while (true) {
+                String input = reader.readLine("Choice [1-" + subs.size() + ", q to quit]: ");
+                if (input == null) {
+                    return null;
+                }
+                String trimmed = input.trim();
+                if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("q")) {
+                    return null;
+                }
+                try {
+                    int choice = Integer.parseInt(trimmed);
+                    if (choice >= 1 && choice <= subs.size()) {
+                        return subs.get(choice - 1).getCommandName();
+                    }
+                } catch (NumberFormatException ignored) {
+                    // fall through
+                }
+                System.out.println("Invalid choice. Please enter a number between 1 and " + subs.size() + ".");
+            }
+        }
     }
 
     @Command(name = "start", description = "Start a new release from current directory")
