@@ -47,6 +47,7 @@ public class ReleaseState {
     private Instant estimatedCompletionAt;
     private boolean dryRun;
     private String distributionManagementSiteUrl;
+    private String scmUrl;
 
     public ReleaseState() {}
 
@@ -247,5 +248,40 @@ public class ReleaseState {
     @JsonIgnore
     public Optional<SitePaths> sitePaths() {
         return SitePaths.parse(distributionManagementSiteUrl);
+    }
+
+    public String getScmUrl() {
+        return scmUrl;
+    }
+
+    public void setScmUrl(String scmUrl) {
+        this.scmUrl = scmUrl;
+    }
+
+    /**
+     * Returns the base browseable URL of the SCM (typically GitHub) for this project, with
+     * any {@code /tree/...} suffix, trailing {@code .git} and trailing {@code /} stripped.
+     * Returns {@link Optional#empty()} when {@link #getScmUrl()} is not set.
+     *
+     * <p>Example: {@code https://github.com/apache/maven-surefire/tree/HEAD} →
+     * {@code https://github.com/apache/maven-surefire}.
+     */
+    @JsonIgnore
+    public Optional<String> scmBrowseUrl() {
+        if (scmUrl == null || scmUrl.isBlank()) {
+            return Optional.empty();
+        }
+        String url = scmUrl.trim();
+        int treeIdx = url.indexOf("/tree/");
+        if (treeIdx > 0) {
+            url = url.substring(0, treeIdx);
+        }
+        if (url.endsWith(".git")) {
+            url = url.substring(0, url.length() - 4);
+        }
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url.isEmpty() ? Optional.empty() : Optional.of(url);
     }
 }

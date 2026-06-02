@@ -104,8 +104,7 @@ public class SendAnnouncementStep extends AbstractStep {
         }
 
         sb.append("Release Notes - Apache ").append(componentName).append(":\n");
-        sb.append("https://github.com/apache/")
-                .append(state.getArtifactId())
+        sb.append(state.scmBrowseUrl().orElse("<scm-url>"))
                 .append("/releases/tag/")
                 .append(state.getReleaseTag())
                 .append("\n\n");

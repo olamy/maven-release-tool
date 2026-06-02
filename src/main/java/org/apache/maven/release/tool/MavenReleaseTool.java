@@ -156,6 +156,11 @@ public class MavenReleaseTool {
                 String siteUrl = detectSiteUrl(runner, absProjectDir);
                 System.out.println(siteUrl != null ? siteUrl : "(not detected)");
 
+                System.out.print("  Detecting SCM URL... ");
+                System.out.flush();
+                String scmUrl = detectScmUrl(runner, absProjectDir);
+                System.out.println(scmUrl != null ? scmUrl : "(not detected)");
+
                 String releaseTag = version != null ? component + "-" + version : null;
 
                 ReleaseState state = ReleaseState.create(component, groupId, version, type, absProjectDir);
@@ -163,6 +168,7 @@ public class MavenReleaseTool {
                 state.setNextVersion(nextVersion);
                 state.setDryRun(dryRun);
                 state.setDistributionManagementSiteUrl(siteUrl);
+                state.setScmUrl(scmUrl);
 
                 String gitUrl = runner.getOutput(absProjectDir, List.of("git", "remote", "get-url", "origin"));
                 state.setGitRemoteUrl(gitUrl);
@@ -264,6 +270,15 @@ public class MavenReleaseTool {
                             "-Dexpression=project.distributionManagement.site.url",
                             "-q",
                             "-DforceStdout"));
+            if (output.isBlank() || output.trim().startsWith("null object or invalid expression")) {
+                return null;
+            }
+            return output.trim();
+        }
+
+        private String detectScmUrl(CommandRunner runner, Path dir) {
+            String output = runner.getOutput(
+                    dir, List.of("mvn", "help:evaluate", "-Dexpression=project.scm.url", "-q", "-DforceStdout"));
             if (output.isBlank() || output.trim().startsWith("null object or invalid expression")) {
                 return null;
             }
