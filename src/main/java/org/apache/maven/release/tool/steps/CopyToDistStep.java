@@ -54,9 +54,9 @@ public class CopyToDistStep extends AbstractStep {
 
         String distCategory = getDistCategory(state);
         String stagingRepoUrl = state.getStagingRepoUrl() != null ? state.getStagingRepoUrl() : "<staging-repo-url>";
+        String groupPath = state.getGroupId() != null ? state.getGroupId().replace('.', '/') : "<group-id>";
 
-        return List.of("svn import " + stagingRepoUrl + "/org/apache/maven/"
-                + (state.getComponentType() == ComponentType.PLUGIN ? "plugins/" : "")
+        return List.of("svn import " + stagingRepoUrl + "/" + groupPath + "/"
                 + state.getArtifactId() + "/" + state.getVersion() + "/"
                 + state.getArtifactId() + "-" + state.getVersion() + "-source-release.zip"
                 + " " + DIST_RELEASE + "/" + distCategory + "/"

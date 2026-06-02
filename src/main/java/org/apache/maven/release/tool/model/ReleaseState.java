@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -45,6 +46,7 @@ public class ReleaseState {
     private String previousTag;
     private Instant estimatedCompletionAt;
     private boolean dryRun;
+    private String distributionManagementSiteUrl;
 
     public ReleaseState() {}
 
@@ -227,5 +229,23 @@ public class ReleaseState {
 
     public void setDryRun(boolean dryRun) {
         this.dryRun = dryRun;
+    }
+
+    public String getDistributionManagementSiteUrl() {
+        return distributionManagementSiteUrl;
+    }
+
+    public void setDistributionManagementSiteUrl(String distributionManagementSiteUrl) {
+        this.distributionManagementSiteUrl = distributionManagementSiteUrl;
+    }
+
+    /**
+     * Parsed view of {@link #getDistributionManagementSiteUrl()} when present and valid.
+     * Returns {@link Optional#empty()} if the URL is missing or does not match the
+     * expected ASF Maven {@code components/} layout.
+     */
+    @JsonIgnore
+    public Optional<SitePaths> sitePaths() {
+        return SitePaths.parse(distributionManagementSiteUrl);
     }
 }

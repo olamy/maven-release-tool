@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.maven.release.tool.exec.CommandRunner;
 import org.apache.maven.release.tool.model.ComponentType;
 import org.apache.maven.release.tool.model.ReleaseState;
+import org.apache.maven.release.tool.model.SitePaths;
 import org.apache.maven.release.tool.model.StepResult;
 
 public class PublishDocumentationStep extends AbstractStep {
@@ -51,18 +52,26 @@ public class PublishDocumentationStep extends AbstractStep {
                     + " -m \"Maven " + state.getVersion() + " released\"");
         }
 
-        String category = getSiteCategory(state);
+        SitePaths paths = state.sitePaths().orElse(null);
+        if (paths == null) {
+            return List.of();
+        }
+        String svnBase = paths.svnBase();
+        String archiveFolder = paths.archiveFolder();
+        String archiveName = paths.archiveName();
+        String liveFolder = paths.liveFolder();
+        String liveName = paths.liveName();
         String artifactId = state.getArtifactId();
         String version = state.getVersion();
+        String versionedName = liveName + "-" + version;
 
         return List.of(
-                "svn cp " + SVNPUBSUB + "/" + category + "-archives/" + artifactId + "-LATEST"
-                        + " " + SVNPUBSUB + "/" + category + "-archives/" + artifactId + "-" + version
+                "svn cp " + svnBase + "/" + archiveFolder + "/" + archiveName
+                        + " " + svnBase + "/" + archiveFolder + "/" + versionedName
                         + " -m \"Archive " + artifactId + " " + version + " documentation\"",
-                "svn rm " + SVNPUBSUB + "/" + category + "/" + artifactId + " -m \"Remove old " + artifactId
-                        + " site\"",
-                "svn cp " + SVNPUBSUB + "/" + category + "-archives/" + artifactId + "-LATEST"
-                        + " " + SVNPUBSUB + "/" + category + "/" + artifactId
+                "svn rm " + svnBase + "/" + liveFolder + "/" + liveName + " -m \"Remove old " + artifactId + " site\"",
+                "svn cp " + svnBase + "/" + archiveFolder + "/" + archiveName
+                        + " " + svnBase + "/" + liveFolder + "/" + liveName
                         + " -m \"Publish " + artifactId + " " + version + " site\"");
     }
 
@@ -74,15 +83,5 @@ public class PublishDocumentationStep extends AbstractStep {
     @Override
     public boolean isApplicable(ComponentType type) {
         return type != ComponentType.EXTENSION;
-    }
-
-    private String getSiteCategory(ReleaseState state) {
-        return switch (state.getComponentType()) {
-            case PLUGIN -> "plugins";
-            case SHARED -> "shared";
-            case PARENT_POM -> "pom";
-            case SKIN -> "skins";
-            default -> "plugins";
-        };
     }
 }

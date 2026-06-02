@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.maven.release.tool.exec.CommandRunner;
 import org.apache.maven.release.tool.model.ComponentType;
 import org.apache.maven.release.tool.model.ReleaseState;
+import org.apache.maven.release.tool.model.SitePaths;
 import org.apache.maven.release.tool.model.StepResult;
 import org.apache.maven.release.tool.persistence.StateStore;
 
@@ -125,13 +126,9 @@ public class SendAnnouncementStep extends AbstractStep {
     }
 
     private String buildSiteUrl(ReleaseState state) {
-        return switch (state.getComponentType()) {
-            case CORE -> "https://maven.apache.org/ref/" + state.getVersion() + "/";
-            case PLUGIN -> "https://maven.apache.org/plugins/" + state.getArtifactId() + "/";
-            case SHARED -> "https://maven.apache.org/shared/" + state.getArtifactId() + "/";
-            case PARENT_POM -> "https://maven.apache.org/pom/" + state.getArtifactId() + "/";
-            case SKIN -> "https://maven.apache.org/skins/" + state.getArtifactId() + "/";
-            default -> "https://maven.apache.org/";
-        };
+        if (state.getComponentType() == ComponentType.CORE) {
+            return "https://maven.apache.org/ref/" + state.getVersion() + "/";
+        }
+        return state.sitePaths().map(SitePaths::liveSiteUrl).orElse("https://maven.apache.org/");
     }
 }

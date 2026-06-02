@@ -151,12 +151,18 @@ public class MavenReleaseTool {
                 String groupId = detectGroupId(runner, absProjectDir);
                 System.out.println(groupId != null ? groupId : "(not detected)");
 
+                System.out.print("  Detecting site URL... ");
+                System.out.flush();
+                String siteUrl = detectSiteUrl(runner, absProjectDir);
+                System.out.println(siteUrl != null ? siteUrl : "(not detected)");
+
                 String releaseTag = version != null ? component + "-" + version : null;
 
                 ReleaseState state = ReleaseState.create(component, groupId, version, type, absProjectDir);
                 state.setReleaseTag(releaseTag);
                 state.setNextVersion(nextVersion);
                 state.setDryRun(dryRun);
+                state.setDistributionManagementSiteUrl(siteUrl);
 
                 String gitUrl = runner.getOutput(absProjectDir, List.of("git", "remote", "get-url", "origin"));
                 state.setGitRemoteUrl(gitUrl);
@@ -247,6 +253,21 @@ public class MavenReleaseTool {
             String output = runner.getOutput(
                     dir, List.of("mvn", "help:evaluate", "-Dexpression=project.groupId", "-q", "-DforceStdout"));
             return output.isBlank() ? null : output.trim();
+        }
+
+        private String detectSiteUrl(CommandRunner runner, Path dir) {
+            String output = runner.getOutput(
+                    dir,
+                    List.of(
+                            "mvn",
+                            "help:evaluate",
+                            "-Dexpression=project.distributionManagement.site.url",
+                            "-q",
+                            "-DforceStdout"));
+            if (output.isBlank() || output.trim().startsWith("null object or invalid expression")) {
+                return null;
+            }
+            return output.trim();
         }
 
         private String detectVersion(CommandRunner runner, Path dir) {

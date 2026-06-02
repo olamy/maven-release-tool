@@ -35,8 +35,8 @@ import dev.tamboui.text.Text;
 import dev.tamboui.widgets.paragraph.Paragraph;
 import org.apache.maven.release.tool.exec.CommandRunner;
 import org.apache.maven.release.tool.integration.GitHubClient;
-import org.apache.maven.release.tool.model.ComponentType;
 import org.apache.maven.release.tool.model.ReleaseState;
+import org.apache.maven.release.tool.model.SitePaths;
 import org.apache.maven.release.tool.model.StepResult;
 import org.apache.maven.release.tool.persistence.StateStore;
 
@@ -216,9 +216,11 @@ public class CallVoteStep extends AbstractStep {
 
         sb.append("Staging repo:\n");
         sb.append(stagingUrl).append("\n");
+        String groupPath = state.getGroupId() != null ? state.getGroupId().replace('.', '/') : "<group-id>";
         sb.append(stagingUrl)
-                .append("/org/apache/maven/")
-                .append(state.getComponentType() == ComponentType.PLUGIN ? "plugins/" : "")
+                .append("/")
+                .append(groupPath)
+                .append("/")
                 .append(state.getArtifactId())
                 .append("/")
                 .append(state.getVersion())
@@ -237,11 +239,8 @@ public class CallVoteStep extends AbstractStep {
                 .append("\n\n");
 
         sb.append("Staging site:\n");
-        sb.append("https://maven.apache.org/")
-                .append(getSiteCategory(state))
-                .append("-archives/")
-                .append(state.getArtifactId())
-                .append("-LATEST/\n\n");
+        sb.append(state.sitePaths().map(SitePaths::stagingSiteUrl).orElse("<staging-site-url>"))
+                .append("\n\n");
 
         sb.append("Guide to testing staged releases:\n");
         sb.append("https://maven.apache.org/guides/development/guide-testing-releases.html\n\n");
@@ -287,7 +286,7 @@ public class CallVoteStep extends AbstractStep {
                 name.append(" ").append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
             }
         }
-        if (state.getComponentType() == ComponentType.PLUGIN) {
+        if (artifactId.endsWith("-plugin")) {
             name.append(" Plugin");
         }
         name.append(" version ").append(version);
@@ -318,15 +317,5 @@ public class CallVoteStep extends AbstractStep {
             repoName = repoName.substring(0, repoName.length() - 4);
         }
         return repoName.isEmpty() ? fallback : repoName;
-    }
-
-    private String getSiteCategory(ReleaseState state) {
-        return switch (state.getComponentType()) {
-            case PLUGIN -> "plugins";
-            case SHARED -> "shared";
-            case PARENT_POM -> "pom";
-            case SKIN -> "skins";
-            default -> "ref";
-        };
     }
 }
