@@ -141,8 +141,9 @@ public class MavenReleaseTool {
                 if (version == null) {
                     System.out.print("  Detecting version... ");
                     System.out.flush();
-                    version = detectVersion(runner, absProjectDir);
-                    System.out.println(version != null ? version : "(not detected, release plugin will prompt)");
+                    String detected = detectVersion(runner, absProjectDir);
+                    System.out.println(detected != null ? detected : "(not detected)");
+                    version = promptVersion(detected);
                 }
 
                 System.out.print("  Detecting group ID... ");
@@ -210,6 +211,22 @@ public class MavenReleaseTool {
                 }
                 Path typed = Path.of(input.trim());
                 return typed.isAbsolute() ? typed : defaultDir.resolve(typed).normalize();
+            }
+        }
+
+        private String promptVersion(String detected) throws IOException {
+            try (Terminal terminal =
+                    TerminalBuilder.builder().system(true).jansi(true).build()) {
+                LineReader reader =
+                        LineReaderBuilder.builder().terminal(terminal).build();
+                String prompt = detected != null
+                        ? "  Release version [" + detected + "]: "
+                        : "  Release version (leave blank to let release plugin prompt): ";
+                String input = reader.readLine(prompt);
+                if (input == null || input.isBlank()) {
+                    return detected;
+                }
+                return input.trim();
             }
         }
 
