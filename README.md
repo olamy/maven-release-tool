@@ -282,5 +282,3 @@ The tool auto-detects component type from the pom.xml parent:
 | `maven-extensions` | EXTENSION |
 
 Override with `--type PLUGIN` if auto-detection is wrong.
-
-
