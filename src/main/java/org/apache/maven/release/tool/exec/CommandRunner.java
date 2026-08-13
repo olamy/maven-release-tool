@@ -59,6 +59,11 @@ public class CommandRunner {
             ProcessBuilder pb = new ProcessBuilder(args);
             pb.directory(workingDir.toFile());
             pb.redirectErrorStream(true);
+            // Connect the child's stdin to the tool's own terminal so interactive
+            // prompts from the forked build (e.g. Maven release plugin questions or
+            // the GPG agent / pinentry passphrase prompt) can be answered by the
+            // user instead of blocking forever on an empty, never-written pipe.
+            pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
             Process process = pb.start();
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
