@@ -41,7 +41,7 @@
   <properties>
     <javaVersion>17</javaVersion>
     <maven.compiler.release>17</maven.compiler.release>
-    <tamboui.version>0.1.0</tamboui.version>
+    <tamboui.version>0.4.0</tamboui.version>
     <picocli.version>4.7.7</picocli.version>
     <jackson.version>2.22.4</jackson.version>
     <jetty.version>12.1.11</jetty.version>
